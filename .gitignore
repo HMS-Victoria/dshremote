@@ -1,0 +1,18 @@
+# 运行时数据（配置、设备令牌、日志）
+.data/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/build/
+*.apk
+*.keystore
+
+# 编辑器
+.vscode/
+.idea/
+*.tmp

@@ -1,0 +1,39 @@
+/* dshremote 移动端注入样式（Phase 0：安全的低风险规则；后续按真实 DOM 迭代） */
+
+html.dsh-mobile {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+html.dsh-mobile body {
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* 供后续移动端布局使用的安全区变量 */
+html.dsh-mobile {
+  --dsh-safe-top: env(safe-area-inset-top, 0px);
+  --dsh-safe-right: env(safe-area-inset-right, 0px);
+  --dsh-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --dsh-safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* 移动端下避免双击缩放（配合 touch-action: manipulation） */
+html.dsh-mobile body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 代码块横向滚动，不撑破布局 */
+html.dsh-mobile pre,
+html.dsh-mobile code {
+  overflow-wrap: anywhere;
+}
+
+/* 选中文字时避免 iOS 放大 */
+@media (max-width: 820px) {
+  html.dsh-mobile textarea,
+  html.dsh-mobile input,
+  html.dsh-mobile select {
+    font-size: 16px;
+  }
+}

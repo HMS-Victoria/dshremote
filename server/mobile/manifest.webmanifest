@@ -1,0 +1,19 @@
+{
+  "name": "DSH Remote",
+  "short_name": "DSH",
+  "description": "DeepSeek Harness 手机远控",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "icons": [
+    {
+      "src": "/__dshremote/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

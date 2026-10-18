@@ -54,6 +54,15 @@ async function main() {
     startedAt: new Date().toISOString(),
   }, null, 2) + '\n');
 
+  // 方便随时查看当前配对码（daemon 重启会换码）
+  await writeFile(path.join(DATA_DIR, 'pairing.json'), JSON.stringify({
+    code: pairing.code,
+    expiresAt: pairing.expiresAt === null ? null : new Date(pairing.expiresAt).toISOString(),
+    localUrl: `${localUrl}/pair?code=${pairing.code}`,
+    urls: urls.map((entry) => `${entry.url}/pair?code=${pairing.code}`),
+    updatedAt: new Date().toISOString(),
+  }, null, 2) + '\n');
+
   let stopping = false;
   const shutdown = async (signal) => {
     if (stopping) return;

@@ -1,4 +1,4 @@
-# 在默认浏览器里打开配对二维码页面（手机扫码配对用）
+﻿# 在默认浏览器里打开配对二维码页面（手机扫码配对用）
 # 用法：.\tools\show-qr.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot

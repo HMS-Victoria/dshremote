@@ -1,4 +1,4 @@
-# 用「受限令牌」以普通用户权限运行 DSH + dshremote daemon（管理员登录不变）
+﻿# 用「受限令牌」以普通用户权限运行 DSH + dshremote daemon（管理员登录不变）
 #
 # 原理：runas /trustlevel:0x20000 会生成一个受限令牌（Basic User），
 # DSH/daemon 进程里没有管理员权限，但仍然是你的用户身份（可以读写你的文件）。

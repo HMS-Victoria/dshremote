@@ -134,8 +134,8 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
       return sendJson(res, 200, {
         ok: true,
         code: pairing?.code ?? null,
-        createdAt: pairing?.createdAt ?? null,
-        expiresAt: pairing?.expiresAt ?? null,
+        createdAt: pairing?.createdAt ? new Date(pairing.createdAt).toISOString() : null,
+        expiresAt: pairing?.expiresAt ? new Date(pairing.expiresAt).toISOString() : null,
         used: pairing?.usedAt !== null && pairing?.usedAt !== undefined,
         oneTime: devices.oneTime,
         publicUrl: publicUrl ?? null,

@@ -1,4 +1,4 @@
-# 查看已配对设备 / 吊销设备 / 清理旧设备（仅本机可调用 daemon 的 loopback 管理接口）
+﻿# 查看已配对设备 / 吊销设备 / 清理旧设备（仅本机可调用 daemon 的 loopback 管理接口）
 # 用法：
 #   .\tools\devices.ps1                  # 列出所有设备
 #   .\tools\devices.ps1 -Revoke <id>     # 吊销指定设备（丢手机时用）

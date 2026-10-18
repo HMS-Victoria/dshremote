@@ -1,4 +1,4 @@
-# 恢复普通（管理员权限）方式启动 DSH + dshremote daemon
+﻿# 恢复普通（管理员权限）方式启动 DSH + dshremote daemon
 #
 # 用法（独立 PowerShell 窗口执行）：
 #   .\tools\start-normal.ps1

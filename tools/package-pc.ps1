@@ -1,4 +1,4 @@
-# 把 dshremote 电脑端（插件 + daemon + 工具 + APK）打包成一个 zip，交给别人测试。
+﻿# 把 dshremote 电脑端（插件 + daemon + 工具 + APK）打包成一个 zip，交给别人测试。
 #
 # 用法：在项目根目录执行
 #   .\tools\package-pc.ps1                 # 打包（含 APK）
@@ -35,6 +35,7 @@ $toolNames = @(
     'show-qr.ps1',
     'diag.ps1',
     'pair-open.ps1',
+    'gui.ps1',
     'set-public-url.ps1',
     'firewall-allow.ps1'
 )
@@ -45,6 +46,7 @@ foreach ($name in $toolNames) {
 }
 
 # 测试说明 + 外网访问说明
+Copy-Item (Join-Path $root 'dshremote-gui.cmd') $stage
 Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-测试说明.md')
 Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（Tailscale）.md')
 Copy-Item (Join-Path $root 'docs\security.md') (Join-Path $stage '安全说明.md')
@@ -81,3 +83,4 @@ Get-ChildItem $stage -Recurse -File | ForEach-Object {
 }
 Write-Host ''
 Write-Host ('ZIP: ' + $zip + '  (' + [math]::Round((Get-Item $zip).Length / 1MB, 1) + ' MB)') -ForegroundColor Green
+

@@ -1,4 +1,4 @@
-# 停止后台运行的 dshremote daemon（含自启模式下 spawn 的 dsh web 宿主）
+﻿# 停止后台运行的 dshremote daemon（含自启模式下 spawn 的 dsh web 宿主）
 # 用法：.\tools\stop.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot

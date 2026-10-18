@@ -1,4 +1,4 @@
-# 把 dsh-remote-host 桥接插件安装/更新到指定 DSH profile（默认 desktop）。
+﻿# 把 dsh-remote-host 桥接插件安装/更新到指定 DSH profile（默认 desktop）。
 #
 # 作用：让 DSH 宿主进程把 { origin, authenticatedUrl } 写到
 #   %USERPROFILE%\.dsh\remote\host-<profile>.json

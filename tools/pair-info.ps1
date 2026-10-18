@@ -1,4 +1,4 @@
-# 显示当前 daemon 的配对码、手机访问地址与设备数量
+﻿# 显示当前 daemon 的配对码、手机访问地址与设备数量
 # 用法：在项目根目录执行  .\tools\pair-info.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -32,9 +32,9 @@ if ($livePairing -and $livePairing.used) {
     Write-Host ' （当前码已使用，一次性模式下会自动轮换）' -ForegroundColor Yellow
 }
 if ($livePairing -and $livePairing.expiresAt) {
-    $expires = ([datetime]$livePairing.expiresAt).ToLocalTime()
+    $expires = ([datetimeoffset]::Parse($livePairing.expiresAt)).LocalDateTime
     if ($expires -lt (Get-Date)) {
-        Write-Host (' （配对码已过期：' + $expires.ToString('HH:mm:ss') + '，重新生成请运行 .\tools\pair-open.ps1）') -ForegroundColor Yellow
+        Write-Host (' （配对码已过期：' + $expires.ToString('HH:mm:ss') + '，重新生成可运行 .\tools\pair-open.ps1 或打开 .\tools\show-qr.ps1 页面）') -ForegroundColor Yellow
     } else {
         Write-Host (' （有效期到 ' + $expires.ToString('HH:mm:ss') + '）') -ForegroundColor DarkGray
     }
@@ -70,7 +70,7 @@ if ($localPairing -and $localPairing.tailscaleUrls) {
     Write-Host ''
 }
 if ($urls.Count -gt 0) {
-    Write-Host ' 手机打开（同一 Wi-Fi）:'
+    Write-Host ' 手机打开（局域网地址，需防火墙放行；当前仅 Tailscale 网段放行）:'
     foreach ($url in $urls) {
         $shown = $url -replace 'code=[^&]+', ('code=' + $code)
         Write-Host ('   ' + $shown)
@@ -103,3 +103,4 @@ if ($alive) {
     Write-Host ' 注意：daemon 可能未运行，配对码可能已过期' -ForegroundColor Yellow
 }
 Write-Host ''
+

@@ -1,4 +1,4 @@
-# Install Android command-line SDK into D:\Android (default).
+﻿# Install Android command-line SDK into D:\Android (default).
 # Usage: pwsh -NoProfile -ExecutionPolicy Bypass -File tools\android-setup.ps1
 # Requires JDK 17+ (Microsoft OpenJDK 21 on this machine).
 param(

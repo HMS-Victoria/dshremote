@@ -1,4 +1,4 @@
-# 允许 dshremote daemon 的端口被局域网 / Tailscale 访问（需要以管理员身份运行 PowerShell）
+﻿# 允许 dshremote daemon 的端口被局域网 / Tailscale 访问（需要以管理员身份运行 PowerShell）
 # 用法：右键 PowerShell「以管理员身份运行」→  .\tools\firewall-allow.ps1
 #      .\tools\firewall-allow.ps1 -Port 7801
 param(

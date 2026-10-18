@@ -1,4 +1,4 @@
-# 从指定 DSH profile 卸载 dsh-remote-host 桥接插件（默认 desktop）。
+﻿# 从指定 DSH profile 卸载 dsh-remote-host 桥接插件（默认 desktop）。
 #
 # 用法：在解压后的目录里执行
 #   .\tools\uninstall-remote-host-plugin.ps1

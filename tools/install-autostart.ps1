@@ -1,4 +1,4 @@
-# 安装「登录 Windows 后自动在后台启动 dshremote daemon」的计划任务。
+﻿# 安装「登录 Windows 后自动在后台启动 dshremote daemon」的计划任务。
 # 用法：.\tools\install-autostart.ps1
 #      .\tools\install-autostart.ps1 -Uninstall   # 卸载
 param(

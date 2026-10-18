@@ -31,10 +31,217 @@ const INJECTION = `
     <script type="module" src="/__dshremote/mobile.js"></script>
 `;
 
+/**
+ * 必须在内核/DSH 客户端启动前执行的引导脚本（插到 <head> 最前）：
+ *  - 注入真实视口高度变量 --dshremote-vh（规避部分 WebView 的 100vh=0）；
+ *  - 包装 WebSocket，把连接关闭（code/reason/帧数/存活时间）上报到 daemon；
+ *  - 上报未捕获 JS 异常，便于诊断手机端问题。
+ */
+const BOOT_INLINE = `
+<script>
+(function () {
+  // ===== 旧内核 polyfill（华为 ArkWeb / 老 Chromium 缺少的 API）=====
+  if (typeof Promise.withResolvers !== 'function') {
+    Promise.withResolvers = function () {
+      var resolve;
+      var reject;
+      var promise = new Promise(function (res, rej) { resolve = res; reject = rej; });
+      return { promise: promise, resolve: resolve, reject: reject };
+    };
+  }
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any !== 'function') {
+    AbortSignal.any = function (signals) {
+      var controller = new AbortController();
+      var list = Array.prototype.slice.call(signals || []);
+      var aborted = null;
+      for (var i = 0; i < list.length; i += 1) {
+        if (list[i] && list[i].aborted) { aborted = list[i]; break; }
+      }
+      if (aborted) { controller.abort(aborted.reason); return controller.signal; }
+      var entries = [];
+      function cleanup() {
+        entries.forEach(function (entry) {
+          try { entry[0].removeEventListener('abort', entry[1]); } catch (error) { /* ignore */ }
+        });
+        entries = [];
+      }
+      list.forEach(function (signal) {
+        if (!signal) return;
+        var handler = function () { cleanup(); controller.abort(signal.reason); };
+        entries.push([signal, handler]);
+        signal.addEventListener('abort', handler, { once: true });
+      });
+      return controller.signal;
+    };
+  }
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.prototype.throwIfAborted !== 'function') {
+    AbortSignal.prototype.throwIfAborted = function () {
+      if (!this.aborted) return;
+      throw this.reason === undefined ? new DOMException('This operation was aborted', 'AbortError') : this.reason;
+    };
+  }
+  if (typeof window.structuredClone !== 'function') {
+    window.structuredClone = function (value) {
+      if (value === null || typeof value !== 'object') return value;
+      try { return JSON.parse(JSON.stringify(value)); } catch (error) { return value; }
+    };
+  }
+  if (!Array.prototype.toSorted) {
+    Object.defineProperty(Array.prototype, 'toSorted', {
+      configurable: true,
+      writable: true,
+      value: function (compare) { return Array.prototype.slice.call(this).sort(compare); }
+    });
+  }
+  if (!Array.prototype.findLastIndex) {
+    Object.defineProperty(Array.prototype, 'findLastIndex', {
+      configurable: true,
+      writable: true,
+      value: function (predicate) {
+        for (var index = this.length - 1; index >= 0; index -= 1) {
+          if (predicate(this[index], index, this)) return index;
+        }
+        return -1;
+      }
+    });
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID !== 'function') {
+    try {
+      Object.defineProperty(crypto, 'randomUUID', {
+        configurable: true,
+        value: function () {
+          var bytes = new Uint8Array(16);
+          crypto.getRandomValues(bytes);
+          bytes[6] = (bytes[6] & 15) | 64;
+          bytes[8] = (bytes[8] & 63) | 128;
+          var hex = Array.prototype.map.call(bytes, function (byte) {
+            return ('0' + byte.toString(16)).slice(-2);
+          }).join('');
+          return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+        }
+      });
+    } catch (error) { /* ignore */ }
+  }
+  if (typeof navigator !== 'undefined' && navigator && typeof navigator.clipboard === 'undefined') {
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: function (text) {
+            return new Promise(function (resolve, reject) {
+              try {
+                var area = document.createElement('textarea');
+                area.value = String(text);
+                area.style.position = 'fixed';
+                area.style.opacity = '0';
+                document.body.appendChild(area);
+                area.focus();
+                area.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(area);
+                if (ok) resolve(); else reject(new Error('copy unavailable'));
+              } catch (error) { reject(error); }
+            });
+          },
+          readText: function () { return Promise.reject(new Error('clipboard read unavailable')); }
+        }
+      });
+    } catch (error) { /* ignore */ }
+  }
+
+  var root = document.documentElement;
+  function applyViewport() {
+    var height = window.innerHeight || root.clientHeight || 0;
+    if (height > 0) root.style.setProperty('--dshremote-vh', height + 'px');
+  }
+  applyViewport();
+  window.addEventListener('resize', applyViewport);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', applyViewport);
+
+  var reported = 0;
+  function report(payload) {
+    try {
+      if (reported > 20) return;
+      reported += 1;
+      fetch('/__dshremote/client-log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(function () {});
+    } catch (error) { /* ignore */ }
+  }
+  window.__dshremoteReport = report;
+
+  // 把 console.error 也上报，便于发现模块初始化失败之类的问题
+  try {
+    var nativeConsoleError = console.error.bind(console);
+    console.error = function () {
+      try {
+        var message = Array.prototype.map.call(arguments, function (arg) {
+          try {
+            return typeof arg === 'string' ? arg : (arg && arg.message) ? arg.message : String(arg);
+          } catch (error) { return ''; }
+        }).join(' ');
+        report({ event: 'console-error', message: message.slice(0, 300) });
+      } catch (error) { /* ignore */ }
+      nativeConsoleError.apply(null, arguments);
+    };
+  } catch (error) { /* ignore */ }
+
+  var NativeWebSocket = window.WebSocket;
+  if (typeof NativeWebSocket === 'function') {
+    function DshremoteWebSocket(url, protocols) {
+      var socket = protocols === undefined ? new NativeWebSocket(url) : new NativeWebSocket(url, protocols);
+      var info = { url: String(url), openedAt: 0, frames: 0 };
+      socket.addEventListener('open', function () { info.openedAt = Date.now(); });
+      socket.addEventListener('message', function () { info.frames += 1; });
+      socket.addEventListener('close', function (event) {
+        report({
+          event: 'ws-close',
+          url: info.url,
+          code: event.code,
+          reason: (event.reason || '').slice(0, 120),
+          frames: info.frames,
+          durationMs: info.openedAt ? Date.now() - info.openedAt : 0
+        });
+      });
+      return socket;
+    }
+    DshremoteWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+    DshremoteWebSocket.OPEN = NativeWebSocket.OPEN;
+    DshremoteWebSocket.CLOSING = NativeWebSocket.CLOSING;
+    DshremoteWebSocket.CLOSED = NativeWebSocket.CLOSED;
+    DshremoteWebSocket.prototype = NativeWebSocket.prototype;
+    window.WebSocket = DshremoteWebSocket;
+  }
+
+  window.addEventListener('error', function (event) {
+    report({
+      event: 'js-error',
+      message: String((event.message || '') + ' @' + (event.filename || '') + ':' + (event.lineno || 0)).slice(0, 300)
+    });
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    var reason = event.reason;
+    report({
+      event: 'unhandled-rejection',
+      message: String(reason && reason.message ? reason.message : reason).slice(0, 300)
+    });
+  });
+})();
+</script>
+<!-- dshremote-boot -->
+`;
+
 export function injectHtml(html) {
   if (typeof html !== 'string' || !html.includes('</head>')) return html;
   if (html.includes('id="dshremote-meta"')) return html;
-  return html.replace('</head>', `${INJECTION}  </head>`);
+  let output = html;
+  if (!output.includes('<!-- dshremote-boot -->') && output.includes('<head>')) {
+    output = output.replace('<head>', `<head>${BOOT_INLINE}`);
+  }
+  return output.replace('</head>', `${INJECTION}  </head>`);
 }
 
 /** 服务 /__dshremote/ 下的静态文件。 */

@@ -39,6 +39,8 @@ function parseArgs(argv) {
       case '--port': result.port = Number(argv[++i]); break;
       case '--connect-port': result.connectPort = Number(argv[++i]); break;
       case '--reload': result.reload = true; break;
+      case '--netlog': result.netlog = true; break;
+      case '--preload-file': result.preloadFile = argv[++i]; break;
       case '--no-mobile': result.mobile = false; break;
       case '--help':
         console.log('用法: node tools/cdp.mjs --url <url> [--width 390] [--height 844] [--wait 8000] [--screenshot out.png] [--dom out.html]');
@@ -167,6 +169,54 @@ class CdpClient {
   }
 }
 
+/** 打开 Network 域并打印 API/WebSocket 诊断（--netlog）。 */
+async function enableNetLog(cdp) {
+  await cdp.send('Network.enable');
+  const interesting = /\/api|remote\.mux|__dshremote/iu;
+  cdp.on('Network.requestWillBeSent', (params) => {
+    const request = params.request ?? {};
+    if (interesting.test(request.url ?? '')) {
+      console.log(`[net ->] ${request.method} ${String(request.url).slice(0, 180)}`);
+    }
+  });
+  cdp.on('Network.responseReceived', (params) => {
+    const response = params.response ?? {};
+    if (interesting.test(response.url ?? '')) {
+      console.log(`[net <-] ${response.status} ${String(response.url).slice(0, 180)}`);
+    }
+  });
+  cdp.on('Network.loadingFailed', (params) => {
+    console.log(`[net FAIL] ${params.errorText ?? ''} blocked=${params.blockedReason ?? '-'} type=${params.type ?? '-'}`);
+  });
+  cdp.on('Network.webSocketCreated', (params) => {
+    console.log(`[ws created] ${String(params.url).slice(0, 160)}`);
+  });
+  cdp.on('Network.webSocketHandshakeResponseReceived', (params) => {
+    const response = params.response ?? {};
+    console.log(`[ws handshake] ${response.status} headers=${JSON.stringify(response.headers ?? {}).slice(0, 180)}`);
+  });
+  let wsFrameRecv = 0;
+  let wsFrameSent = 0;
+  cdp.on('Network.webSocketFrameReceived', (params) => {
+    const frame = params.response ?? {};
+    wsFrameRecv += 1;
+    if (wsFrameRecv <= 8) console.log(`[ws recv] op=${frame.opcode} len=${String(frame.payloadData ?? '').length}`);
+    if (frame.opcode === 8) console.log(`[ws recv CLOSE] ${JSON.stringify(frame).slice(0, 200)}`);
+  });
+  cdp.on('Network.webSocketFrameSent', (params) => {
+    const frame = params.response ?? {};
+    wsFrameSent += 1;
+    if (wsFrameSent <= 8) console.log(`[ws sent] op=${frame.opcode} len=${String(frame.payloadData ?? '').length}`);
+    if (frame.opcode === 8) console.log(`[ws sent CLOSE] ${JSON.stringify(frame).slice(0, 200)}`);
+  });
+  cdp.on('Network.webSocketClosed', (params) => {
+    console.log(`[ws closed] ${JSON.stringify(params).slice(0, 200)}`);
+  });
+  cdp.on('Network.webSocketFrameError', (params) => {
+    console.log(`[ws frame error] ${String(params.errorMessage ?? '').slice(0, 200)}`);
+  });
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const edge = args.edge ?? EDGE_DEFAULT;
@@ -203,6 +253,7 @@ async function main() {
         const entry = params.entry ?? {};
         console.log(`[log.${entry.level}] ${String(entry.text ?? '').slice(0, 500)}`);
       });
+      if (args.netlog) await enableNetLog(cdp);
       if (args.reload) {
         await cdp.send('Page.reload', { ignoreCache: true });
       }
@@ -232,6 +283,12 @@ async function main() {
 
       await cdp.send('Page.enable');
       await cdp.send('Runtime.enable');
+      if (args.preloadFile) {
+        const { readFile } = await import('node:fs/promises');
+        const source = await readFile(args.preloadFile, 'utf8');
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source });
+      }
+      if (args.netlog) await enableNetLog(cdp);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: args.width,
         height: args.height,

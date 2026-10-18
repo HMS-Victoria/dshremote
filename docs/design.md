@@ -33,6 +33,18 @@
 待办：用户真机安装确认；扫码配对（QR + 相机权限）；通知（依赖 daemon 事件通道）；
 重新配对/失效令牌的提示。
 
+**真机兼容性修复（旧 WebView / 华为 ArkWeb）**：真机（某款 Android 手机，Android 12
+兼容层 WebView）出现"一直重新连接中"。通过 daemon 诊断 + 页面内注入的 WebSocket
+监控定位到：WS 握手/鉴权/API 全部正常，但客户端**一帧都收不到**，且页面报
+`Promise.withResolvers is not a function` / `AbortSignal.any is not a function`。
+即旧内核缺少这些新 API，DSH 客户端模块初始化失败，mux 握手帧从未发出 → 就绪超时 →
+无限重连。修复：在注入的 `<head>` 引导脚本里加 polyfill（`Promise.withResolvers`、
+`AbortSignal.any`、`throwIfAborted`、`structuredClone`、`toSorted`、`findLastIndex`、
+`crypto.randomUUID`、`navigator.clipboard` 兜底），并加 console.error/JS 异常/
+WebSocket 关闭码上报（`POST /__dshremote/client-log`）。用"删除这些 API 再加载页面"
+的模拟旧内核测试验证：mux 帧收发恢复正常、无重连。另新增 daemon
+`/__dshremote/diag` 诊断端点与 `tools/diag.ps1`。
+
 ### M2（2026-10-18）：移动端适配核心可用
 
 已验证（390×844 无头浏览器 + 真实 DSH web 宿主）：

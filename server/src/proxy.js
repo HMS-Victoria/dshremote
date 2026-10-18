@@ -11,10 +11,23 @@ import { injectHtml, pairPageHtml, serveMobileAsset } from './inject.js';
 
 const PAIR_API_PATH = '/__dshremote/pair';
 const HEALTH_PATH = '/__dshremote/health';
+const DIAG_PATH = '/__dshremote/diag';
+const CLIENT_LOG_PATH = '/__dshremote/client-log';
+const DIAG_LIMIT = 400;
 
 export function createProxy({ upstream, devices, log }) {
   const upstreamUrl = new URL(upstream.origin);
   const failures = new Map();
+  const events = [];
+
+  /** 诊断环形缓冲：记录 WS 握手/关闭与 API 请求，供 /__dshremote/diag 查看。 */
+  const record = (event) => {
+    const entry = { at: new Date().toISOString(), ...event };
+    events.push(entry);
+    if (events.length > DIAG_LIMIT) events.shift();
+    if (event.kind !== 'api') log(`[diag] ${JSON.stringify(entry)}`);
+    return entry;
+  };
 
   const server = http.createServer((req, res) => {
     handleRequest(req, res).catch((error) => {
@@ -37,8 +50,16 @@ export function createProxy({ upstream, devices, log }) {
     if (pathname === HEALTH_PATH) {
       return sendJson(res, 200, { ok: true, upstream: upstream.origin, pid: process.pid });
     }
+    if (pathname === DIAG_PATH) {
+      const ip = req.socket.remoteAddress ?? '';
+      if (!isLoopback(ip)) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      return sendJson(res, 200, { ok: true, now: new Date().toISOString(), upstream: upstream.origin, events });
+    }
     if (pathname === PAIR_API_PATH && req.method === 'POST') {
       return handlePairApi(req, res);
+    }
+    if (pathname === CLIENT_LOG_PATH && req.method === 'POST') {
+      return handleClientLog(req, res);
     }
     if (pathname.startsWith('/__dshremote/')) {
       return serveMobileAsset(pathname, res);
@@ -50,13 +71,14 @@ export function createProxy({ upstream, devices, log }) {
     const device = devices.verifyCookie(req.headers.cookie);
     if (!device) {
       if (wantsHtml(req)) {
+        record({ kind: 'unauthorized', path: pathname, ip: clientKey(req) });
         res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
         res.end(pairPageHtml());
         return;
       }
       return sendJson(res, 401, { ok: false, error: 'unauthorized' });
     }
-    return forward(req, res);
+    return forward(req, res, device);
   }
 
   async function handlePairPage(req, res, url) {
@@ -106,8 +128,49 @@ export function createProxy({ upstream, devices, log }) {
     });
   }
 
-  function forward(req, res) {
+  /** 页面内注入脚本上报的客户端诊断（WebSocket 关闭、JS 异常）。 */
+  async function handleClientLog(req, res) {
+    const body = await readBody(req, 32 * 1024).catch(() => '');
+    let payload;
+    try {
+      payload = JSON.parse(body || '{}');
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain' }).end('bad json');
+      return;
+    }
+    const device = devices.verifyCookie(req.headers.cookie);
+    record({
+      kind: 'client-log',
+      ip: clientKey(req),
+      device: device?.id ?? null,
+      event: String(payload.event ?? 'unknown').slice(0, 24),
+      url: String(payload.url ?? '').slice(0, 160),
+      code: Number.isFinite(payload.code) ? payload.code : null,
+      reason: String(payload.reason ?? '').slice(0, 140),
+      frames: Number.isFinite(payload.frames) ? payload.frames : null,
+      durationMs: Number.isFinite(payload.durationMs) ? payload.durationMs : null,
+      message: String(payload.message ?? '').slice(0, 300),
+      ua: String(req.headers['user-agent'] ?? '').slice(0, 70),
+    });
+    res.writeHead(204, { 'cache-control': 'no-store' });
+    res.end();
+  }
+
+  function forward(req, res, device) {
     const targetPath = req.url ?? '/';
+    const isApi = targetPath.startsWith('/api');
+    const startedAt = Date.now();
+    if (isApi) {
+      res.on('finish', () => record({
+        kind: 'api',
+        device: device.id,
+        ip: clientKey(req),
+        method: req.method,
+        path: targetPath.slice(0, 100),
+        status: res.statusCode,
+        ms: Date.now() - startedAt,
+      }));
+    }
     const headers = { ...req.headers };
     headers.host = upstream.host;
     headers.cookie = upstream.cookie;
@@ -159,6 +222,20 @@ export function createProxy({ upstream, devices, log }) {
 
   function handleUpgrade(req, socket, head) {
     const device = devices.verifyCookie(req.headers.cookie);
+    const ip = socket.remoteAddress ?? 'unknown';
+    const ua = String(req.headers['user-agent'] ?? '').slice(0, 60);
+    const origin = String(req.headers.origin ?? '').slice(0, 80);
+    const startedAt = Date.now();
+    record({
+      kind: 'ws-upgrade',
+      ip,
+      authenticated: device !== null,
+      device: device?.id ?? null,
+      path: (req.url ?? '').slice(0, 80),
+      origin,
+      ua,
+      cookiePresent: typeof req.headers.cookie === 'string' && req.headers.cookie.length > 0,
+    });
     if (!device) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();
@@ -186,11 +263,40 @@ export function createProxy({ upstream, devices, log }) {
       socket.pipe(upstreamSocket);
       upstreamSocket.pipe(socket);
     });
+    // 记录上游握手响应首行（101 / 401 / 403 ...）
+    upstreamSocket.once('data', (chunk) => {
+      const statusLine = chunk.toString('latin1').split('\r\n')[0].slice(0, 90);
+      record({ kind: 'ws-upstream', ip, statusLine });
+    });
+    // 双向字节计数（排查“握手成功但没有帧”的问题）
+    let clientBytes = 0;
+    let upstreamBytes = 0;
+    let firstClientChunk = '';
+    socket.on('data', (chunk) => {
+      clientBytes += chunk.length;
+      if (clientBytes <= 64) firstClientChunk += chunk.toString('latin1');
+    });
+    upstreamSocket.on('data', (chunk) => {
+      upstreamBytes += chunk.length;
+    });
     upstreamSocket.on('error', (error) => {
-      log(`[proxy] WebSocket 上游错误: ${error.message}`);
+      record({ kind: 'ws-error', ip, error: error.message, ms: Date.now() - startedAt });
       socket.destroy();
     });
+    upstreamSocket.on('close', () => socket.destroy());
     socket.on('error', () => upstreamSocket.destroy());
+    socket.on('close', () => {
+      upstreamSocket.destroy();
+      record({
+        kind: 'ws-close',
+        ip,
+        device: device.id,
+        ms: Date.now() - startedAt,
+        clientBytes,
+        upstreamBytes,
+        firstClientChunk: firstClientChunk.slice(0, 40),
+      });
+    });
   }
 }
 
@@ -205,6 +311,10 @@ function isSecure(req) {
 
 function clientKey(req) {
   return req.socket.remoteAddress ?? 'unknown';
+}
+
+function isLoopback(address) {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 function sendJson(res, status, value) {

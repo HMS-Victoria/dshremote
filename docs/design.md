@@ -46,6 +46,25 @@
 - 已实测：APPEND 事件 → daemon 跟随 → recent 接口与 WS 推送均正常；
   事件文件在插件 v0.2 **下次随 DSH 重启加载**后开始产生真实事件。
 
+**M4.3 手机通知客户端（APK 0.2.0）**
+
+- Android 新增 `EventService`（前台服务，OkHttp WebSocket）订阅
+  `ws://<服务器>/__dshremote/events`（带设备 cookie），断线指数退避重连；
+- 通知分级：
+  - `dshremote_approval`（高优先级，震动）：审批请求、Agent 错误；
+  - `dshremote_turns`（默认优先级）：回合完成；
+  - `dshremote_service`（低优先级，常驻）：连接状态；
+- 应用在前台时不弹事件通知（WebView 里已能看到）；首次连接把历史事件标记为已读，
+  避免一次弹十几条旧通知；
+- 点击通知 → 带上 `open_session` 启动 MainActivity（singleTask）→
+  `window.dshremoteOpenSession(sessionId)` 展开抽屉并按
+  `data-row-key="session:<id>"` 点击对应会话行（已实测能打开会话）；
+- 权限：Android 13+ 启动时请求 `POST_NOTIFICATIONS`；前台服务声明
+  `dataSync` 类型；版本 0.2.0（versionCode 3）。
+- 模拟器验证：APK 安装启动后服务自动连接 daemon（daemon diag 出现 `events-ws`
+  记录）；注入测试事件后 `dumpsys notification` 确认在
+  `dshremote_approval` 通道发出通知（importance=4）。
+
 ### M3（2026-10-18）：Android 混合壳（MVP）
 
 - Gradle 工程（AGP 8.7.3 / Kotlin 2.0.21 / Compose BOM 2024.10 / JDK 21 / SDK 35，

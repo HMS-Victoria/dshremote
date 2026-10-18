@@ -1,10 +1,32 @@
 # dshremote 设计方案
 
-> 状态：Phase 0 + M2 完成；**M3 Android 混合壳已完成模拟器端到端验证**
-> （2026-10-18，同一 APK 待用户真机确认）；M1/M4 待办
+> 状态：Phase 0 + M2 + M3 完成（真机验证通过）；**M4 插件接管模式已实现并在
+> 真实桌面宿主上验证**；M1/M3.5 待办
 > 最后更新：2026-10-18
 
 ## 0. 实施进度
+
+### M4（2026-10-18）：插件接管桌面 App 宿主（核心目标达成）
+
+- 新增宿主桥接插件 `plugin/dsh-remote-host`（本地 npm 包 + bundle 补丁）：
+  在 DSH 宿主进程内取 `ctx.webServer.getOrigin()` 与
+  `ctx.connection.authenticatedUrl()`，原子写入
+  `~/.dsh/remote/host-<profile>.json`（含 origin、带 token 的 authenticatedUrl、
+  pid、profile），dispose 时删除，每 5 分钟刷新一次；
+- daemon 新增**接管模式**：`hostMode: auto|plugin|spawn`（默认 auto）。
+  有新鲜的 host.json 就接管已运行的宿主（例如桌面 App 自己的 Host），否则回退自启；
+  `ExportedHost` 负责读文件 → token 换签名 cookie → 探活 200 → 交给代理层；
+- **宿主热切换**：daemon 轮询 host.json，桌面 DSH 重启后 pid/端口变化会自动重新接管
+  （代理层每次请求通过 `getUpstream()` 取当前上游，不需要重启 daemon）；
+- **实测**：插件安装到 desktop profile 后被**运行中的桌面 App 热加载**（无需重启），
+  daemon 立即接管 `127.0.0.1:50716`（桌面 App 自己的 Host）；通过 7801 代理访问时
+  手机界面正常、`/api/remote.mux` 帧收发正常；且**不再出现 `session/writer-held`**
+  ——手机操作的就是桌面正在用的同一个宿主；
+- 工具：`tools/install-remote-host-plugin.ps1` / `uninstall-remote-host-plugin.ps1`
+  （备份 profile 配置、pnpm link、幂等维护 bundles 列表）；
+  `tools/pair-info.ps1` 现在会显示宿主模式与上游地址；
+- 注意：desktop profile 只能由 Electron App 加载（CLI 启动会被拒绝：
+  `profile "desktop" is managed exclusively by the Electron application`）。
 
 ### M3（2026-10-18）：Android 混合壳（MVP）
 
@@ -249,7 +271,7 @@ App 只配置 `serverUrl + deviceToken`，底层可切换：
 | M1 | daemon 完整：配对、设备管理、审计、配置、健壮重连 | 多个设备配对/撤销；断线自动恢复 | 1–2 天 |
 | M2 | 移动端适配层：PWA + mobile.css/js 迭代 | 390×844 下主要流程可用（会话/聊天/审批/文件） | 2–3 天 |
 | M3 | Android 混合 App：Gradle 工程、WebView、扫码配对、前台服务通知 | 真机安装 APK，局域网全流程可用 | 3–5 天 |
-| M4 | 插件接管桌面 App（host.json + 事件通知） | 手机实时接管桌面正在跑的会话与审批 | 1–2 天 |
+| M4 | 插件接管桌面 App（host.json + 事件通知） | ✅ 接管模式已实现并验证；事件通知（审批/轮次）待做 | 1–2 天 |
 | M5 | 隧道集成（cloudflared）+ 可选半原生/全原生 | 任何网络下可用 | 按需 |
 
 ## 8. 工程结构

@@ -1,0 +1,22 @@
+{
+  "name": "dsh-remote-host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "dshremote host bridge: export the running DSH host origin and authenticated URL so a LAN daemon (dshremote) can take over this host instead of spawning its own.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

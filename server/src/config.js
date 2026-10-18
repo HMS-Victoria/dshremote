@@ -36,6 +36,17 @@ export const DEFAULTS = {
     /** 配对码有效期（毫秒），默认 7 天；null 表示本进程内不过期 */
     codeTtlMs: 7 * 24 * 60 * 60 * 1000,
   },
+  /**
+   * 宿主接入模式：
+   *   auto   先尝试接管插件导出的宿主（host-<profile>.json），没有/失效则自启一个；
+   *   plugin 只用插件导出的宿主（缺文件直接报错，不会自启）；
+   *   spawn  始终自启一个独立 dsh web 宿主（M3 之前的行为）。
+   */
+  hostMode: 'auto',
+  /** 接管模式下读取哪个 profile 导出的 host.json（桌面 App 为 desktop） */
+  hostProfile: 'desktop',
+  /** 显式指定 host.json 路径（默认 <DSH_HOME>/remote/host-<hostProfile>.json） */
+  hostFile: null,
   /** 是否在启动时打印所有局域网地址 */
   printLanUrls: true,
 };
@@ -58,6 +69,9 @@ function fromEnv(config) {
   if (env.DSHREMOTE_DSH_CLI) config.dsh.cli = env.DSHREMOTE_DSH_CLI;
   if (env.DSHREMOTE_PORT) config.listen.port = Number(env.DSHREMOTE_PORT);
   if (env.DSHREMOTE_HOST) config.listen.host = env.DSHREMOTE_HOST;
+  if (env.DSHREMOTE_HOST_MODE) config.hostMode = env.DSHREMOTE_HOST_MODE;
+  if (env.DSHREMOTE_HOST_PROFILE) config.hostProfile = env.DSHREMOTE_HOST_PROFILE;
+  if (env.DSHREMOTE_HOST_FILE) config.hostFile = env.DSHREMOTE_HOST_FILE;
   return config;
 }
 

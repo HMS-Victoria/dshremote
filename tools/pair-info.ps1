@@ -28,6 +28,11 @@ if ($runtime -and $runtime.pid) {
 }
 if ($alive) {
     Write-Host (' daemon 运行中（pid ' + $runtime.pid + '，端口 ' + $runtime.listen.port + '）') -ForegroundColor DarkGray
+    if ($runtime.hostMode -eq 'plugin') {
+        Write-Host (' 宿主模式: 接管模式（' + $runtime.upstream + '，profile=' + $runtime.upstreamProfile + '）') -ForegroundColor DarkGray
+    } elseif ($runtime.hostMode) {
+        Write-Host (' 宿主模式: 自启模式（' + $runtime.upstream + '）') -ForegroundColor DarkGray
+    }
 } else {
     Write-Host ' 注意：daemon 可能未运行，配对码可能已过期' -ForegroundColor Yellow
 }

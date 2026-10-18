@@ -15,8 +15,12 @@ const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
 const DIAG_LIMIT = 1200;
 
-export function createProxy({ upstream, devices, log }) {
-  const upstreamUrl = new URL(upstream.origin);
+/**
+ * @param {object} options
+ * @param {() => { origin: string, host: string, cookie: string }} options.getUpstream
+ *   每次请求时读取当前上游（宿主可能被插件重新导出/重启，由 daemon 热切换）。
+ */
+export function createProxy({ getUpstream, devices, log }) {
   const failures = new Map();
   const events = [];
 
@@ -52,12 +56,12 @@ export function createProxy({ upstream, devices, log }) {
     const pathname = url.pathname;
 
     if (pathname === HEALTH_PATH) {
-      return sendJson(res, 200, { ok: true, upstream: upstream.origin, pid: process.pid });
+      return sendJson(res, 200, { ok: true, upstream: getUpstream().origin, pid: process.pid });
     }
     if (pathname === DIAG_PATH) {
       const ip = req.socket.remoteAddress ?? '';
       if (!isLoopback(ip)) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
-      return sendJson(res, 200, { ok: true, now: new Date().toISOString(), upstream: upstream.origin, events });
+      return sendJson(res, 200, { ok: true, now: new Date().toISOString(), upstream: getUpstream().origin, events });
     }
     if (pathname === PAIR_API_PATH && req.method === 'POST') {
       return handlePairApi(req, res);
@@ -161,6 +165,8 @@ export function createProxy({ upstream, devices, log }) {
   }
 
   function forward(req, res, device) {
+    const upstream = getUpstream();
+    const upstreamUrl = new URL(upstream.origin);
     const targetPath = req.url ?? '/';
     const isApi = targetPath.startsWith('/api');
     const startedAt = Date.now();
@@ -245,6 +251,8 @@ export function createProxy({ upstream, devices, log }) {
       socket.destroy();
       return;
     }
+    const upstream = getUpstream();
+    const upstreamUrl = new URL(upstream.origin);
     const upstreamSocket = net.connect(Number(upstreamUrl.port), upstreamUrl.hostname, () => {
       const lines = [
         `GET ${req.url} HTTP/1.1`,

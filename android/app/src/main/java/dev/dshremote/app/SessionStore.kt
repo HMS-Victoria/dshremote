@@ -13,6 +13,13 @@ class SessionStore(context: Context) {
 
     val paired: Boolean get() = !serverUrl.isNullOrEmpty() && !deviceToken.isNullOrEmpty()
 
+    /** 最近一次已通知的事件时间（ISO 字符串），用于服务重连后去重。 */
+    var lastEventAt: String
+        get() = prefs.getString("last_event_at", "") ?: ""
+        set(value) {
+            prefs.edit().putString("last_event_at", value).apply()
+        }
+
     fun save(serverUrl: String, token: String) {
         prefs.edit()
             .putString("server_url", serverUrl)

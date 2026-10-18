@@ -24,6 +24,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import org.json.JSONObject
+import kotlin.coroutines.resume
 
 /** 在 WebView 里选择图片（对应 DSH 的图片附件）时，桥接系统文件选择器。 */
 private class FileChooserBridge {
@@ -59,6 +64,8 @@ private class NativeBridge(private val onShowMenu: () -> Unit) {
 fun WebViewScreen(
     serverUrl: String,
     token: String,
+    pendingSessionId: String? = null,
+    onSessionOpened: () -> Unit = {},
     onSwitchServer: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -73,6 +80,31 @@ fun WebViewScreen(
     var showMenu by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val serverHost = remember(serverUrl) { runCatching { Uri.parse(serverUrl).host }.getOrNull() }
+
+    // 通知点击带来的会话 id：等页面脚本就绪后调用 window.dshremoteOpenSession 打开对应会话
+    LaunchedEffect(pendingSessionId, webView) {
+        val view = webView
+        val sessionId = pendingSessionId
+        if (view == null || sessionId == null) return@LaunchedEffect
+        val quoted = JSONObject.quote(sessionId)
+        val script = """
+            (function () {
+              if (!window.dshremoteOpenSession) return 'not-ready';
+              return window.dshremoteOpenSession($quoted) ? true : false;
+            })()
+        """.trimIndent()
+        repeat(25) {
+            val result = suspendCancellableCoroutine<String?> { continuation ->
+                view.evaluateJavascript(script) { value -> continuation.resume(value) }
+            }
+            if (result == "true") {
+                onSessionOpened()
+                return@LaunchedEffect
+            }
+            delay(300)
+        }
+        onSessionOpened()
+    }
 
     // 返回键：先让页面消费（关闭抽屉/右栏），再退回历史，最后弹出连接菜单
     BackHandler {

@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.2.9';
+const VERSION = '0.3.0';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -247,6 +247,26 @@ function init() {
       }, 260);
     } catch (error) {
       log(`打开设置失败: ${error}`);
+    }
+  };
+
+  // 通知点击：打开指定会话。会话行带 data-row-key="session:<id>"，
+  // 抽屉未展开时先展开（会话行可能还没渲染，原生侧会重试）。
+  window.dshremoteOpenSession = (sessionId) => {
+    try {
+      const selector = `[data-row-key="session:${String(sessionId)}"]`;
+      let row = document.querySelector(selector);
+      if (row === null && !isDrawerOpen()) {
+        toggleDrawer();
+        row = document.querySelector(selector);
+      }
+      if (row === null) return false;
+      row.scrollIntoView({ block: 'center' });
+      row.click();
+      return true;
+    } catch (error) {
+      log(`打开会话失败: ${error}`);
+      return false;
     }
   };
 

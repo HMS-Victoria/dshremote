@@ -10,11 +10,13 @@ import { createHash } from 'node:crypto';
 import { deviceCookie } from './auth.js';
 import { injectHtml, pairPageHtml, serveMobileAsset } from './inject.js';
 import { lanUrls } from './net.js';
+import { listDirectory } from './browse.js';
 
 const PAIR_API_PATH = '/__dshremote/pair';
 const HEALTH_PATH = '/__dshremote/health';
 const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
+const FS_PATH = '/__dshremote/fs';
 const EVENTS_PATH = '/__dshremote/events';
 const EVENTS_RECENT_PATH = '/__dshremote/events/recent';
 const DEVICES_PATH = '/__dshremote/devices';
@@ -125,6 +127,17 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
       log(`[auth] 配对码已手动轮换: ${pairing.code}`);
       onPairingChanged?.(pairing);
       return sendJson(res, 200, { ok: true, code: pairing.code, expiresAt: pairing.expiresAt });
+    }
+    // 手机端「添加工作区」：浏览电脑上的目录（设备 cookie 鉴权）
+    if (pathname === FS_PATH && req.method === 'GET') {
+      const device = devices.verifyCookie(req.headers.cookie);
+      if (!device) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      try {
+        const listing = await listDirectory(url.searchParams.get('path') ?? '');
+        return sendJson(res, 200, { ok: true, ...listing });
+      } catch (error) {
+        return sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : '无法读取目录' });
+      }
     }
     if (pathname.startsWith('/__dshremote/')) {
       return serveMobileAsset(pathname, res);

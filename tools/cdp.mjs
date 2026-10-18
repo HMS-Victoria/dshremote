@@ -40,6 +40,7 @@ function parseArgs(argv) {
       case '--connect-port': result.connectPort = Number(argv[++i]); break;
       case '--reload': result.reload = true; break;
       case '--netlog': result.netlog = true; break;
+    case '--netlog-body': result.netlog = true; result.netlogBody = true; break;
       case '--preload-file': result.preloadFile = argv[++i]; break;
       case '--no-mobile': result.mobile = false; break;
       case '--help':
@@ -170,7 +171,7 @@ class CdpClient {
 }
 
 /** 打开 Network 域并打印 API/WebSocket 诊断（--netlog）。 */
-async function enableNetLog(cdp) {
+async function enableNetLog(cdp, options = {}) {
   await cdp.send('Network.enable');
   const interesting = /\/api|remote\.mux|__dshremote/iu;
   cdp.on('Network.requestWillBeSent', (params) => {
@@ -253,7 +254,7 @@ async function main() {
         const entry = params.entry ?? {};
         console.log(`[log.${entry.level}] ${String(entry.text ?? '').slice(0, 500)}`);
       });
-      if (args.netlog) await enableNetLog(cdp);
+      if (args.netlog) await enableNetLog(cdp, args);
       if (args.reload) {
         await cdp.send('Page.reload', { ignoreCache: true });
       }
@@ -288,7 +289,7 @@ async function main() {
         const source = await readFile(args.preloadFile, 'utf8');
         await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source });
       }
-      if (args.netlog) await enableNetLog(cdp);
+      if (args.netlog) await enableNetLog(cdp, args);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: args.width,
         height: args.height,

@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.9';
+const VERSION = '0.4.1';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -352,6 +352,219 @@ function installRowActionClicks() {
   }, true);
 }
 
+/** 底部轻提示。 */
+function showToast(message, duration = 2800) {
+  let toast = document.querySelector('.dshremote-toast');
+  if (toast === null) {
+    toast = document.createElement('div');
+    toast.className = 'dshremote-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.dataset.visible = 'true';
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => {
+    toast.dataset.visible = 'false';
+  }, duration);
+}
+
+/** 调用宿主 API（与网页界面相同的 /api/<namespace>/<method> RPC 信封）。 */
+async function hostRpc(method, args) {
+  const response = await fetch(`/api/${method}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      type: 'client-request',
+      rpcId: crypto.randomUUID(),
+      method,
+      payload: { args },
+    }),
+  });
+  const envelope = await response.json().catch(() => null);
+  const result = envelope?.result;
+  if (result?.ok !== true) {
+    throw new Error(result?.error?.message || `请求失败（HTTP ${response.status}）`);
+  }
+  return result.value;
+}
+
+/**
+ * 手机端「添加工作区」。
+ *
+ * DSH 桌面端的“添加工作区”会调用主机原生目录选择器（只会在电脑上弹窗，手机上没反应）。
+ * 这里拦截该按钮，改用 daemon 的目录浏览接口（/__dshremote/fs）在手机上选目录，
+ * 选好后调用宿主的 workspace/create 注册工作区（宿主会推送更新，侧边栏自动刷新）。
+ */
+function installWorkspacePicker() {
+  let overlay = null;
+  let listing = null;
+  let busy = false;
+  let showHidden = false;
+
+  const close = () => {
+    if (overlay !== null) overlay.remove();
+    overlay = null;
+    listing = null;
+    busy = false;
+  };
+
+  const setStatus = (state, message) => {
+    if (overlay === null) return;
+    const confirmButton = overlay.querySelector('.dshremote-ws-confirm');
+    const cancelButton = overlay.querySelector('.dshremote-ws-cancel');
+    const errorBox = overlay.querySelector('.dshremote-ws-error');
+    confirmButton.disabled = state === 'loading' || state === 'error' || listing === null;
+    cancelButton.disabled = state === 'loading';
+    confirmButton.textContent = state === 'loading' ? '加载中…' : state === 'saving' ? '添加中…' : '选择此文件夹';
+    confirmButton.disabled = confirmButton.disabled || state === 'saving';
+    if (state === 'saving') {
+      confirmButton.textContent = '添加中…';
+      confirmButton.disabled = true;
+    }
+    errorBox.hidden = state !== 'error';
+    if (state === 'error') errorBox.textContent = message || '操作失败';
+  };
+
+  const renderList = () => {
+    if (overlay === null || listing === null) return;
+    overlay.querySelector('.dshremote-ws-path').textContent = listing.path;
+    overlay.querySelector('.dshremote-ws-path').dataset.path = listing.path;
+    const list = overlay.querySelector('.dshremote-ws-list');
+    list.textContent = '';
+
+    const addRow = (icon, label, onClick, className) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = `dshremote-ws-row ${className ?? ''}`.trim();
+      row.innerHTML = `<span class="dshremote-ws-icon">${icon}</span><span class="dshremote-ws-name"></span>`;
+      row.querySelector('.dshremote-ws-name').textContent = label;
+      row.addEventListener('click', onClick);
+      list.appendChild(row);
+    };
+
+    if (listing.parent !== null) {
+      addRow('↑', '上一级', () => { void load(listing.parent); }, 'dshremote-ws-row-parent');
+    }
+    if (listing.drives.length > 1) {
+      const drives = document.createElement('div');
+      drives.className = 'dshremote-ws-drives';
+      for (const drive of listing.drives) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'dshremote-ws-drive';
+        chip.textContent = drive.replace(/\\$/u, '');
+        chip.addEventListener('click', () => { void load(drive); });
+        drives.appendChild(chip);
+      }
+      list.appendChild(drives);
+    }
+    const visibleEntries = showHidden ? listing.entries : listing.entries.filter((entry) => !entry.hidden);
+    if (visibleEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'dshremote-ws-empty';
+      empty.textContent = showHidden ? '这个文件夹里没有子文件夹' : '没有可显示的文件夹（可点下方「显示隐藏文件夹」）';
+      list.appendChild(empty);
+    }
+    const folderIcon = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 4.5c0-.55.45-1 1-1h3.2l1.2 1.5h6.1c.55 0 1 .45 1 1v6c0 .55-.45 1-1 1h-10.5c-.55 0-1-.45-1-1v-7.5Z" stroke="currentColor" stroke-width="1.2"/></svg>';
+    for (const entry of visibleEntries) {
+      addRow(folderIcon, entry.name, () => { void load(entry.path); });
+    }
+    const hiddenCount = listing.entries.length - visibleEntries.length;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'dshremote-ws-toggle';
+    toggle.textContent = showHidden ? '隐藏隐藏文件夹' : `显示隐藏文件夹${hiddenCount > 0 ? `（${hiddenCount}）` : ''}`;
+    toggle.addEventListener('click', () => {
+      showHidden = !showHidden;
+      renderList();
+    });
+    list.appendChild(toggle);
+    setStatus(visibleEntries.length === 0 ? 'empty' : 'ready');
+  };
+
+  async function load(pathValue) {
+    if (overlay === null) return;
+    busy = true;
+    setStatus('loading');
+    try {
+      const params = new URLSearchParams();
+      if (typeof pathValue === 'string' && pathValue !== '') params.set('path', pathValue);
+      const response = await fetch(`/__dshremote/fs?${params.toString()}`, { headers: { accept: 'application/json' } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw new Error(payload?.error || `无法读取目录（HTTP ${response.status}）`);
+      }
+      listing = payload;
+      busy = false;
+      renderList();
+    } catch (error) {
+      busy = false;
+      listing = null;
+      setStatus('error', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function confirm() {
+    if (busy || listing === null) return;
+    busy = true;
+    const targetPath = listing.path;
+    setStatus('saving');
+    try {
+      const value = await hostRpc('workspace/create', { request: { path: targetPath } });
+      const title = value?.workspace?.title || targetPath;
+      const created = value?.created !== false;
+      close();
+      showToast(created ? `已添加工作区：${title}` : `工作区已存在：${title}`);
+    } catch (error) {
+      busy = false;
+      setStatus('error', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function open() {
+    if (overlay !== null) return;
+    const element = document.createElement('div');
+    element.className = 'dshremote-ws-overlay';
+    element.innerHTML = `
+      <div class="dshremote-ws-sheet" role="dialog" aria-label="添加工作区">
+        <div class="dshremote-ws-head">
+          <span class="dshremote-ws-title">添加工作区</span>
+          <button type="button" class="dshremote-ws-close" aria-label="关闭">✕</button>
+        </div>
+        <div class="dshremote-ws-path"></div>
+        <div class="dshremote-ws-list"></div>
+        <div class="dshremote-ws-error" hidden></div>
+        <div class="dshremote-ws-actions">
+          <button type="button" class="dshremote-ws-cancel">取消</button>
+          <button type="button" class="dshremote-ws-confirm">选择此文件夹</button>
+        </div>
+      </div>`;
+    element.addEventListener('click', (event) => {
+      if (event.target === element) close();
+    });
+    element.querySelector('.dshremote-ws-close').addEventListener('click', close);
+    element.querySelector('.dshremote-ws-cancel').addEventListener('click', close);
+    element.querySelector('.dshremote-ws-confirm').addEventListener('click', () => { void confirm(); });
+    document.body.appendChild(element);
+    overlay = element;
+    setStatus('loading');
+    void load('');
+  }
+
+  // 拦截 DSH 自己的“添加工作区”按钮（它会打开电脑上的原生选择器）
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target === null) return;
+    const button = target.closest('button, [role="button"]');
+    if (button === null) return;
+    const label = button.getAttribute('aria-label') || '';
+    if (!label.includes('添加工作区')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    open();
+  }, true);
+}
+
 function init() {
   buildFab();
   installSidebarObserver();
@@ -362,6 +575,7 @@ function init() {
   installConnectionBanner();
   installStatusRow();
   installRowActionClicks();
+  installWorkspacePicker();
   scheduleSync();
 
   // 原生外壳（Android）返回键：优先关闭抽屉/右栏，返回 true 表示已消费

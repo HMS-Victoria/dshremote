@@ -677,3 +677,197 @@ html.dsh-mobile [class*="sessionRow"] [class*="rowActions"] button[aria-label*="
 html.dsh-mobile [class*="sessionRow"] [class*="time"] {
   display: none !important;
 }
+/* ===== 添加工作区（手机端目录浏览器） ===== */
+.dshremote-ws-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dshremote-ws-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  max-height: min(78vh, var(--dshremote-vh, 100vh));
+  padding: 14px 16px calc(14px + var(--dsh-safe-bottom));
+  border-radius: 18px 18px 0 0;
+  background: var(--dshremote-panel-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+}
+
+.dshremote-ws-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.dshremote-ws-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.dshremote-ws-close {
+  border: 0;
+  background: transparent;
+  color: #8b949e;
+  font-size: 16px;
+  padding: 4px 8px;
+}
+
+.dshremote-ws-path {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #8b949e;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.dshremote-ws-list {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.dshremote-ws-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6edf3;
+  font-size: 14px;
+  text-align: left;
+}
+
+.dshremote-ws-row:active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.dshremote-ws-row-parent {
+  color: #8b949e;
+}
+
+.dshremote-ws-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b949e;
+}
+
+.dshremote-ws-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dshremote-ws-empty {
+  padding: 22px 8px;
+  color: #6e7681;
+  font-size: 13px;
+}
+
+.dshremote-ws-drives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 8px 4px;
+}
+
+.dshremote-ws-drive {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: #e6edf3;
+  font-size: 12px;
+}
+
+.dshremote-ws-error {
+  margin: 6px 2px;
+  color: #ff7b72;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dshremote-ws-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.dshremote-ws-actions button {
+  flex: 1;
+  height: 44px;
+  border-radius: 11px;
+  font-size: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #e6edf3;
+}
+
+.dshremote-ws-confirm {
+  border: 0 !important;
+  background: #4f8cff !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.dshremote-ws-actions button:disabled {
+  opacity: 0.55;
+}
+
+/* 轻提示 */
+.dshremote-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + var(--dsh-safe-bottom));
+  transform: translateX(-50%);
+  z-index: 260;
+  max-width: calc(100vw - 48px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(22, 27, 34, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6edf3;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.dshremote-toast[data-visible="true"] {
+  opacity: 1;
+}
+
+.dshremote-ws-toggle {
+  display: block;
+  margin: 6px auto 4px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #8b949e;
+  font-size: 12px;
+}

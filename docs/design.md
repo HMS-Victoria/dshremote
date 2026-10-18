@@ -1,9 +1,29 @@
 # dshremote 设计方案
 
-> 状态：Phase 0 完成；**M2 移动端适配核心可用**（2026-10-18）；M1/M3/M4 待办
+> 状态：Phase 0 + M2 完成；**M3 Android 混合壳已产出 APK**（2026-10-18，待真机验证）；
+> M1/M4 待办
 > 最后更新：2026-10-18
 
 ## 0. 实施进度
+
+### M3（2026-10-18）：Android 混合壳（MVP）
+
+- Gradle 工程（AGP 8.7.3 / Kotlin 2.0.21 / Compose BOM 2024.10 / JDK 21 / SDK 35，
+  Gradle 8.11.1 装在 `D:\Android\gradle-8.11.1`，并生成 wrapper）；
+- **原生配对页**：服务器地址 + 6 位配对码 → `POST /__dshremote/pair` 换取设备令牌
+  （HttpURLConnection，IO 线程 + 错误提示）；令牌存 SharedPreferences；
+- **WebView 壳**：写入 `dshremote_device` Cookie 后加载 daemon；支持图片附件
+  （系统文件选择器）、外部链接交给系统浏览器、返回键先交给注入脚本
+  （`window.dshremoteGoBack`，关闭抽屉/右栏）再退回历史，最后弹原生连接菜单；
+- **原生连接菜单**：注入脚本里长按左上角悬浮按钮可调用 `window.DshRemoteNative.showMenu()`
+  （刷新页面 / 切换服务器 / 退出）；
+- 构建脚本 `tools/build-android.mjs`，产物：
+  `android/app/build/outputs/apk/debug/app-debug.apk`（9.5MB debug，包名
+  `dev.dshremote.app`，minSdk 26 / target 35）；`dist/dshremote-0.1.0-debug.apk` 为副本；
+- 已验证：APK badging 正常、Gradle wrapper 可用、daemon 的 POST 配对 API 返回令牌。
+
+待办：真机安装验证（配对 → WebView 加载 → 输入/文件选择/返回键）；通知功能推迟到
+事件通道（daemon 侧）就绪后实现；后续可加扫码配对（QR）。
 
 ### M2（2026-10-18）：移动端适配核心可用
 

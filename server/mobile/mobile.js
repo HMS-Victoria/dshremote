@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -196,6 +196,20 @@ function init() {
   installAutoClose();
   installViewportClass();
   scheduleSync();
+
+  // 原生外壳（Android）返回键：优先关闭抽屉/右栏，返回 true 表示已消费
+  window.dshremoteGoBack = () => {
+    if (isDrawerOpen()) {
+      toggleDrawer();
+      return true;
+    }
+    if (isRightOpen()) {
+      closeRightBar();
+      return true;
+    }
+    return false;
+  };
+
   if (location.hash.includes('dshremote-debug')) root.classList.add('dsh-mobile-debug');
   log(`mobile shell v${VERSION} ready (${window.innerWidth}x${window.innerHeight})`);
 }

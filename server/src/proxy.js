@@ -16,6 +16,10 @@ const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
 const EVENTS_PATH = '/__dshremote/events';
 const EVENTS_RECENT_PATH = '/__dshremote/events/recent';
+const DEVICES_PATH = '/__dshremote/devices';
+const DEVICES_REVOKE_PATH = '/__dshremote/devices/revoke';
+const PAIRING_PATH = '/__dshremote/pairing';
+const PAIRING_ROTATE_PATH = '/__dshremote/pairing/rotate';
 const DIAG_LIMIT = 1200;
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
@@ -25,8 +29,10 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
  *   每次请求时读取当前上游（宿主可能被插件重新导出/重启，由 daemon 热切换）。
  * @param {{ getRecent: (limit?: number) => object[], subscribe: (fn: (event: object) => void) => () => void }} [options.eventBus]
  *   宿主事件总线（审批/轮次等），用于 `/__dshremote/events` 推送。
+ * @param {(pairing: object) => void} [options.onPairingChanged]
+ *   配对码轮换（一次性码被使用 / 手动轮换）后的回调，daemon 用它更新配对信息文件。
  */
-export function createProxy({ getUpstream, devices, log, eventBus }) {
+export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged }) {
   const failures = new Map();
   const events = [];
 
@@ -82,6 +88,43 @@ export function createProxy({ getUpstream, devices, log, eventBus }) {
       const limit = Number.isFinite(requested) ? Math.max(1, Math.min(100, Math.floor(requested))) : 20;
       return sendJson(res, 200, { ok: true, events: eventBus?.getRecent(limit) ?? [] });
     }
+    // ── 本机管理接口（仅 loopback）：设备列表/吊销、配对码查询/轮换 ─────────
+    if (pathname === DEVICES_PATH && req.method === 'GET') {
+      if (!isLoopback(req.socket.remoteAddress ?? '')) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      return sendJson(res, 200, { ok: true, devices: devices.listDevices() });
+    }
+    if (pathname === DEVICES_REVOKE_PATH && req.method === 'POST') {
+      if (!isLoopback(req.socket.remoteAddress ?? '')) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      const body = await readBody(req, 16 * 1024);
+      let payload;
+      try {
+        payload = JSON.parse(body || '{}');
+      } catch {
+        return sendJson(res, 400, { ok: false, error: 'invalid-json' });
+      }
+      const removed = await devices.revoke(String(payload.id ?? ''));
+      if (removed) log(`[auth] 已吊销设备: ${String(payload.id ?? '')}`);
+      return sendJson(res, 200, { ok: true, removed });
+    }
+    if (pathname === PAIRING_PATH && req.method === 'GET') {
+      if (!isLoopback(req.socket.remoteAddress ?? '')) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      const pairing = devices.pairing;
+      return sendJson(res, 200, {
+        ok: true,
+        code: pairing?.code ?? null,
+        createdAt: pairing?.createdAt ?? null,
+        expiresAt: pairing?.expiresAt ?? null,
+        used: pairing?.usedAt !== null && pairing?.usedAt !== undefined,
+        oneTime: devices.oneTime,
+      });
+    }
+    if (pathname === PAIRING_ROTATE_PATH && req.method === 'POST') {
+      if (!isLoopback(req.socket.remoteAddress ?? '')) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      const pairing = devices.newPairingCode();
+      log(`[auth] 配对码已手动轮换: ${pairing.code}`);
+      onPairingChanged?.(pairing);
+      return sendJson(res, 200, { ok: true, code: pairing.code, expiresAt: pairing.expiresAt });
+    }
     if (pathname.startsWith('/__dshremote/')) {
       return serveMobileAsset(pathname, res);
     }
@@ -102,12 +145,26 @@ export function createProxy({ getUpstream, devices, log, eventBus }) {
     return forward(req, res, device);
   }
 
+  /** 配对成功后：一次性配对码立即作废并轮换，并通知 daemon 更新配对信息文件。 */
+  function rotatePairingCode() {
+    try {
+      const { rotated } = devices.consumePairingCode();
+      if (rotated !== null) {
+        log(`[auth] 配对码已作废并轮换，新配对码: ${rotated.code}`);
+        onPairingChanged?.(rotated);
+      }
+    } catch (error) {
+      log(`[auth] 轮换配对码失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async function handlePairPage(req, res, url) {
     const code = url.searchParams.get('code');
     if (code) {
       if (devices.pairingCodeValid(code)) {
         const device = await devices.issueDevice('手机');
         log(`[auth] 新设备配对: ${device.id} (${device.name})`);
+        rotatePairingCode();
         res.writeHead(302, {
           'set-cookie': deviceCookie(device.token, isSecure(req)),
           location: '/',
@@ -142,6 +199,7 @@ export function createProxy({ getUpstream, devices, log, eventBus }) {
     }
     const device = await devices.issueDevice(payload.deviceName || 'Android');
     log(`[auth] 新设备配对（API）: ${device.id} (${device.name})`);
+    rotatePairingCode();
     return sendJson(res, 200, {
       ok: true,
       token: device.token,

@@ -11,8 +11,9 @@
 > **M4 插件接管已生效**：plugin/dsh-remote-host 已装进 desktop profile，
 > daemon 以接管模式直接操控桌面 DSH 的宿主（不再有 session/writer-held 冲突）；
 > 安装/卸载见 	ools/install-remote-host-plugin.ps1、	ools/uninstall-remote-host-plugin.ps1。
-> 下一步：通知动作（审批直接处理）→ M1 daemon 加固 → M3.5 扫码/横屏细节。
-> 已支持：手机通知（审批/回合完成/错误）+ 点击通知打开对应会话。
+> 下一步：扫码配对 → 通知动作（审批直接处理）→ 横屏/软键盘细节。
+> 已支持：手机通知（审批/回合完成/错误）+ 点击通知打开对应会话；
+> daemon 一次性配对码、设备列表/吊销/清理、审计日志、后台与开机自启脚本。
 > 完整方案见 [docs/design.md](docs/design.md)；Android 构建见
 > [android/README.md](android/README.md)。
 >

@@ -6,10 +6,12 @@
  *   - 自启模式（spawn）：自己拉起一个 `dsh web` 宿主再代理给手机；
  *   - 接管模式（plugin）：读取 dsh-remote-host 插件导出的 host.json，直接接管
  *     已经在运行的宿主（例如桌面 App 自己的 Host），避免两个 Host 争抢会话。
+ *
+ * daemon 启动后始终监视 host.json：桌面 DSH 后启动/重启时自动切换到接管模式。
  */
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { DATA_DIR, loadConfig } from './config.js';
 import { DeviceStore } from './auth.js';
 import { DshHost, ExportedHost, dshHomeDir, exportedHostPath } from './dsh-host.js';
@@ -18,6 +20,15 @@ import { createProxy } from './proxy.js';
 import { lanUrls } from './net.js';
 
 const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);
+
+/** 审计日志：把配对/吊销等安全相关事件追加到 .data/audit.log（JSONL）。 */
+function createAuditLogger() {
+  const file = path.join(DATA_DIR, 'audit.log');
+  return (event, detail = {}) => {
+    const line = `${JSON.stringify({ at: new Date().toISOString(), event, ...detail })}\n`;
+    appendFile(file, line, 'utf8').catch(() => {});
+  };
+}
 
 /**
  * 按配置选择宿主：优先接管插件导出的宿主，失败时按模式回退。
@@ -51,11 +62,11 @@ async function connectHost(config) {
 }
 
 /**
- * 接管模式下监视插件导出的 host.json：桌面 DSH 重启后会重写该文件，
- * 检测到 pid/端口/更新时间变化就重新换取 cookie 并热切换上游。
- * @param {{ file: string, hostRef: { host: object, upstream: object }, log: (message: string) => void }} options
+ * 监视插件导出的 host.json：桌面 DSH 启动/重启后（pid/端口/更新时间变化）
+ * 自动重新换取 cookie 并热切换上游；从自启模式切换到接管模式时会停掉自启宿主。
+ * @param {{ file: string, hostRef: { host: object, upstream: object }, log: (message: string) => void, onSwitched?: (upstream: object) => void }} options
  */
-function startHostWatcher({ file, hostRef, log }) {
+function startHostWatcher({ file, hostRef, log, onSwitched }) {
   let initialized = false;
   let lastSignature = '';
   const poll = async () => {
@@ -71,10 +82,20 @@ function startHostWatcher({ file, hostRef, log }) {
       if (signature === lastSignature) return;
       const candidate = new ExportedHost(file, log);
       const next = await candidate.start();
+      const previous = hostRef.upstream;
+      if (previous?.mode === 'spawn') {
+        log('[host] 检测到桌面宿主，停止自启宿主并切换为接管模式');
+        try {
+          await hostRef.host.stop();
+        } catch {
+          // 停不掉也不影响接管
+        }
+      }
       hostRef.host = candidate;
       hostRef.upstream = next;
       lastSignature = signature;
-      log(`[host] 已热切换上游: ${next.origin}`);
+      log(`[host] 已热切换上游: ${next.origin}（profile=${next.profile}）`);
+      onSwitched?.(next);
     } catch {
       // 宿主正在重启 / 文件暂不可读：保持现状，下一轮再试
     }
@@ -87,8 +108,11 @@ async function main() {
   const config = await loadConfig();
   await mkdir(DATA_DIR, { recursive: true });
 
+  const audit = createAuditLogger();
   const devices = new DeviceStore(path.join(DATA_DIR, 'devices.json'), {
     codeTtlMs: config.pairing.codeTtlMs,
+    oneTime: config.pairing.oneTime !== false,
+    onAudit: audit,
   });
   await devices.load();
   const pairing = devices.newPairingCode();
@@ -98,21 +122,65 @@ async function main() {
   const hostRef = { host, upstream };
 
   // 宿主事件（审批 / 轮次 / 错误）：插件写 JSONL，daemon 跟随并推给手机 App。
-  const eventsProfile = upstream.profile ?? config.dsh.profile ?? 'desktop';
-  const eventsFile = config.hostEventsFile
-    || path.join(dshHomeDir(), 'remote', `events-${eventsProfile}.jsonl`);
-  const eventBus = new HostEventBus(eventsFile, log);
-  eventBus.start();
+  // 宿主切换（例如从自启切到桌面接管）时事件文件也会随 profile 变化。
+  const eventBusRef = { current: null };
+  const eventBus = {
+    getRecent: (limit) => eventBusRef.current?.getRecent(limit) ?? [],
+    subscribe: (listener) => eventBusRef.current?.subscribe(listener) ?? (() => {}),
+  };
+  const eventsFileFor = (profile) => config.hostEventsFile
+    || path.join(dshHomeDir(), 'remote', `events-${profile ?? config.dsh.profile ?? 'desktop'}.jsonl`);
+  const startEventBus = (profile) => {
+    eventBusRef.current?.stop();
+    eventBusRef.current = new HostEventBus(eventsFileFor(profile), log);
+    eventBusRef.current.start();
+  };
+  startEventBus(upstream.profile);
 
-  const proxy = createProxy({ getUpstream: () => hostRef.upstream, devices, log, eventBus });
+  const runtimeFile = path.join(DATA_DIR, 'runtime.json');
+  const pairingFile = path.join(DATA_DIR, 'pairing.json');
+  let port = 0;
+  let urls = [];
+
+  const writePairingInfo = async (current, reason) => {
+    await writeFile(pairingFile, JSON.stringify({
+      code: current.code,
+      expiresAt: current.expiresAt === null ? null : new Date(current.expiresAt).toISOString(),
+      localUrl: `http://127.0.0.1:${port}/pair?code=${current.code}`,
+      urls: urls.map((entry) => `${entry.url}/pair?code=${current.code}`),
+      oneTime: devices.oneTime,
+      reason,
+      updatedAt: new Date().toISOString(),
+    }, null, 2) + '\n');
+  };
+  const writeRuntimeInfo = async (current) => {
+    await writeFile(runtimeFile, JSON.stringify({
+      pid: process.pid,
+      hostMode: current.mode,
+      upstream: current.origin,
+      upstreamProfile: current.profile ?? null,
+      listen: { host: config.listen.host, port },
+      startedAt: new Date().toISOString(),
+    }, null, 2) + '\n');
+  };
+
+  const proxy = createProxy({
+    getUpstream: () => hostRef.upstream,
+    devices,
+    log,
+    eventBus,
+    onPairingChanged: (nextPairing) => {
+      void writePairingInfo(nextPairing, 'rotated');
+    },
+  });
   await new Promise((resolve, reject) => {
     proxy.once('error', reject);
     proxy.listen(config.listen.port, config.listen.host, resolve);
   });
-  const port = proxy.address().port;
+  port = proxy.address().port;
 
   const localUrl = `http://127.0.0.1:${port}`;
-  const urls = config.printLanUrls ? lanUrls(port) : [];
+  urls = config.printLanUrls ? lanUrls(port) : [];
   log('==============================================');
   log(' dshremote 已启动');
   log(` 宿主模式: ${upstream.mode === 'plugin' ? '接管模式（插件导出的桌面宿主）' : '自启模式（独立 dsh web 宿主）'}`);
@@ -121,35 +189,22 @@ async function main() {
   for (const entry of urls) {
     log(` 手机访问: ${entry.url}/pair?code=${pairing.code}   (${entry.name})`);
   }
-  log(` 配对码:   ${pairing.code}`);
+  log(` 配对码:   ${pairing.code}${devices.oneTime ? '（一次性，配对后自动轮换）' : ''}`);
   log('==============================================');
 
-  await writeFile(path.join(DATA_DIR, 'runtime.json'), JSON.stringify({
-    pid: process.pid,
-    hostMode: upstream.mode,
-    upstream: upstream.origin,
-    upstreamProfile: upstream.profile ?? null,
-    listen: { host: config.listen.host, port },
-    startedAt: new Date().toISOString(),
-  }, null, 2) + '\n');
+  await writeRuntimeInfo(upstream);
+  await writePairingInfo(pairing, 'startup');
 
-  // 接管模式：监视 host.json，桌面 DSH 重启（pid/端口变化）后自动重新接管。
-  if (upstream.mode === 'plugin') {
-    startHostWatcher({
-      file: config.hostFile || exportedHostPath(config.hostProfile || 'desktop'),
-      hostRef,
-      log,
-    });
-  }
-
-  // 方便随时查看当前配对码（daemon 重启会换码）
-  await writeFile(path.join(DATA_DIR, 'pairing.json'), JSON.stringify({
-    code: pairing.code,
-    expiresAt: pairing.expiresAt === null ? null : new Date(pairing.expiresAt).toISOString(),
-    localUrl: `${localUrl}/pair?code=${pairing.code}`,
-    urls: urls.map((entry) => `${entry.url}/pair?code=${pairing.code}`),
-    updatedAt: new Date().toISOString(),
-  }, null, 2) + '\n');
+  // 始终监视 host.json：桌面 DSH 后启动/重启时自动切到接管模式。
+  startHostWatcher({
+    file: config.hostFile || exportedHostPath(config.hostProfile || 'desktop'),
+    hostRef,
+    log,
+    onSwitched: (next) => {
+      void writeRuntimeInfo(next);
+      startEventBus(next.profile);
+    },
+  });
 
   let stopping = false;
   const shutdown = async (signal) => {
@@ -157,7 +212,7 @@ async function main() {
     stopping = true;
     log(`收到 ${signal}，正在关闭…`);
     proxy.close();
-    eventBus.stop();
+    eventBusRef.current?.stop();
     await hostRef.host.stop();
     log('已退出');
     process.exit(0);

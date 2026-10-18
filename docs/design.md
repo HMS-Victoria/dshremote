@@ -1,10 +1,28 @@
 # dshremote 设计方案
 
-> 状态：Phase 0 + M2 + M3 完成（真机验证通过）；**M4 插件接管模式已实现并在
-> 真实桌面宿主上验证**；M1/M3.5 待办
+> 状态：Phase 0 + M1 + M2 + M3 完成（真机验证通过）；**M4 插件接管 + 事件通知
+> 已在真实桌面宿主/真机上验证**；M3.5（扫码配对）待办
 > 最后更新：2026-10-18
 
 ## 0. 实施进度
+
+### M1（2026-10-18）：daemon 加固（安全 / 可长期运行）
+
+- **一次性配对码**：默认 `pairing.oneTime = true`，配对成功后立即作废并轮换新码
+  （旧码再使用返回 403，已实测）；`pair-info.ps1` 从 daemon 的 loopback 接口读取
+  **当前**配对码，轮换后立即可见；可配置 `pairing.oneTime` 关闭；
+- **设备管理**（loopback-only 接口，`tools/devices.ps1`）：
+  - `GET /__dshremote/devices` 列出设备（id/名称/创建时间/最近使用）；
+  - `POST /__dshremote/devices/revoke` 吊销令牌（丢手机时用，立即失效）；
+  - `-Prune` 清理长期未使用设备；已顺手清理 100+ 台测试遗留设备（保留真机/模拟器）；
+  - `GET /__dshremote/pairing`、`POST /__dshremote/pairing/rotate` 查询/轮换配对码；
+- **审计日志**：配对/吊销写入 `.data/audit.log`（JSONL，含时间/设备 id/名称）；
+- **后台运行**：`tools/start.ps1 -Background`（隐藏窗口、日志 `.data/daemon.log`）、
+  `tools/stop.ps1`（同时清理自启模式遗留的 dsh web 宿主）；
+- **开机自启（可选）**：`tools/install-autostart.ps1` 注册登录计划任务
+  （不默认安装，用户自行执行）；配合宿主监视器：daemon 先启动时走自启模式，
+  桌面 DSH 起来后 5s 内自动切换到接管模式（并停掉自启宿主）；
+- 说明：desktop profile 只能由 Electron App 加载；接管模式不关闭桌面宿主。
 
 ### M4（2026-10-18）：插件接管桌面 App 宿主（核心目标达成）
 
@@ -305,7 +323,7 @@ App 只配置 `serverUrl + deviceToken`，底层可切换：
 | 阶段 | 内容 | 验收 | 预估 |
 |---|---|---|---|
 | M0 | 代理链路 spike：自启宿主 + token 交换 + HTTP/WS 代理 + 基础注入 | 手机/无头浏览器打开真实 DSH 界面并完成一轮对话 | 0.5–1 天 |
-| M1 | daemon 完整：配对、设备管理、审计、配置、健壮重连 | 多个设备配对/撤销；断线自动恢复 | 1–2 天 |
+| M1 | daemon 完整：配对、设备管理、审计、配置、健壮重连 | ✅ 一次性配对码/设备吊销/审计/后台与自启脚本已完成 | 1–2 天 |
 | M2 | 移动端适配层：PWA + mobile.css/js 迭代 | 390×844 下主要流程可用（会话/聊天/审批/文件） | 2–3 天 |
 | M3 | Android 混合 App：Gradle 工程、WebView、扫码配对、前台服务通知 | 真机安装 APK，局域网全流程可用 | 3–5 天 |
 | M4 | 插件接管桌面 App（host.json + 事件通知） | ✅ 接管模式已实现并验证；事件通知（审批/轮次）待做 | 1–2 天 |

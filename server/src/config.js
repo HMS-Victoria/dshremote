@@ -35,6 +35,8 @@ export const DEFAULTS = {
   pairing: {
     /** 配对码有效期（毫秒），默认 7 天；null 表示本进程内不过期 */
     codeTtlMs: 7 * 24 * 60 * 60 * 1000,
+    /** 配对码是否一次性：配对成功后立即作废并轮换新码（默认 true） */
+    oneTime: true,
   },
   /**
    * 宿主接入模式：

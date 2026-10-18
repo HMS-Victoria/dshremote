@@ -13,18 +13,22 @@ const PAIR_API_PATH = '/__dshremote/pair';
 const HEALTH_PATH = '/__dshremote/health';
 const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
-const DIAG_LIMIT = 400;
+const DIAG_LIMIT = 1200;
 
 export function createProxy({ upstream, devices, log }) {
   const upstreamUrl = new URL(upstream.origin);
   const failures = new Map();
   const events = [];
 
-  /** 诊断环形缓冲：记录 WS 握手/关闭与 API 请求，供 /__dshremote/diag 查看。 */
+  /** 诊断环形缓冲：记录 WS 握手/关闭、客户端上报与 API 请求，供 /__dshremote/diag 查看。 */
   const record = (event) => {
     const entry = { at: new Date().toISOString(), ...event };
     events.push(entry);
-    if (events.length > DIAG_LIMIT) events.shift();
+    if (events.length > DIAG_LIMIT) {
+      // 缓冲满时优先丢弃最旧的普通 API 记录，保留客户端上报/连接事件
+      const apiIndex = events.findIndex((item) => item.kind === 'api');
+      events.splice(apiIndex >= 0 ? apiIndex : 0, 1);
+    }
     if (event.kind !== 'api') log(`[diag] ${JSON.stringify(entry)}`);
     return entry;
   };

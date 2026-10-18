@@ -252,6 +252,16 @@ function init() {
 
   if (location.hash.includes('dshremote-debug')) root.classList.add('dsh-mobile-debug');
   log(`mobile shell v${VERSION} ready (${window.innerWidth}x${window.innerHeight})`);
+  window.__dshremoteReport?.({
+    event: 'boot',
+    message: JSON.stringify({
+      version: VERSION,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      dpr: window.devicePixelRatio,
+      ua: navigator.userAgent.slice(0, 90),
+    }),
+  });
 }
 
 function waitForSidebar(attempt = 0) {

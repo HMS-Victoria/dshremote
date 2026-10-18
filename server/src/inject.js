@@ -237,6 +237,8 @@ const BOOT_INLINE = `
       report({
         event: 'viewport',
         message: JSON.stringify({
+          shell: root.dataset.dshremoteVersion || null,
+          url: location.href,
           innerW: window.innerWidth,
           innerH: window.innerHeight,
           vvW: viewport ? Math.round(viewport.width) : null,

@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.4.2';
+const VERSION = '0.4.4';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -551,17 +551,36 @@ function installWorkspacePicker() {
     void load('');
   }
 
-  // 拦截 DSH 自己的“添加工作区”按钮（它会打开电脑上的原生选择器）
+  // 拦截 DSH 自己的“添加工作区”入口（侧边栏 + 新建会话页的工作区菜单都会走原生选择器）
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target === null) return;
-    const button = target.closest('button, [role="button"]');
+    const button = target.closest('button, [role="button"], [role="menuitem"]');
     if (button === null) return;
     const label = button.getAttribute('aria-label') || '';
-    if (!label.includes('添加工作区')) return;
+    const text = (button.textContent || '').trim();
+    const isAddWorkspace = label.includes('添加工作区') || text === '添加工作区' || text.startsWith('添加工作区…');
+    if (!isAddWorkspace) return;
     event.preventDefault();
     event.stopPropagation();
-    open();
+    // 从 DSH 的工作区下拉菜单点进来时，先让该菜单收起再弹自己的选择器
+    // （菜单是 position:fixed 的 portal，offsetParent 恒为 null，所以只看 DOM 是否存在）
+    const hasOpenPortal = document.querySelector('[class*="_portal_"]') !== null;
+    if (hasOpenPortal) {
+      const escape = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        keyCode: 27,
+        which: 27,
+        bubbles: true,
+        cancelable: true,
+      });
+      (document.activeElement ?? document.body).dispatchEvent(escape);
+      document.dispatchEvent(escape);
+      setTimeout(open, 60);
+    } else {
+      open();
+    }
   }, true);
 }
 

@@ -681,7 +681,8 @@ html.dsh-mobile [class*="sessionRow"] [class*="time"] {
 .dshremote-ws-overlay {
   position: fixed;
   inset: 0;
-  z-index: 240;
+  /* DSH 的弹层 portal z-index 是 1100，这里要盖在它上面 */
+  z-index: 2000;
   display: flex;
   align-items: flex-end;
   justify-content: center;

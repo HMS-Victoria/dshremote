@@ -292,10 +292,44 @@ export function createProxy({ getUpstream, devices, log, eventBus }) {
 
     socket.on('close', cleanup);
     socket.on('error', cleanup);
+    // 客户端（OkHttp）会发 WebSocket ping 帧并要求 pong；必须回应，否则客户端会判定
+    // 连接超时并反复重连（表现为约每分钟断一次）。这里解析客户端帧，只处理 ping/close。
+    let wsBuffer = Buffer.alloc(0);
     socket.on('data', (chunk) => {
-      // 只关心客户端的 close 帧（opcode 0x8）；其余帧忽略（本通道是单向推送）。
-      const opcode = chunk.length > 0 ? (chunk[0] & 0x0f) : -1;
-      if (opcode === 0x8) cleanup();
+      try {
+        wsBuffer = Buffer.concat([wsBuffer, chunk]);
+        while (wsBuffer.length >= 2) {
+          const opcode = wsBuffer[0] & 0x0f;
+          const masked = (wsBuffer[1] & 0x80) !== 0;
+          let length = wsBuffer[1] & 0x7f;
+          let offset = 2;
+          if (length === 126) {
+            if (wsBuffer.length < 4) return;
+            length = wsBuffer.readUInt16BE(2);
+            offset = 4;
+          } else if (length === 127) {
+            if (wsBuffer.length < 10) return;
+            length = Number(wsBuffer.readBigUInt64BE(2));
+            offset = 10;
+          }
+          const maskOffset = offset;
+          if (masked) offset += 4;
+          if (wsBuffer.length < offset + length) return;
+          const payload = Buffer.from(wsBuffer.subarray(offset, offset + length));
+          if (masked) {
+            const mask = wsBuffer.subarray(maskOffset, maskOffset + 4);
+            for (let index = 0; index < payload.length; index += 1) payload[index] ^= mask[index % 4];
+          }
+          wsBuffer = wsBuffer.subarray(offset + length);
+          if (opcode === 0x8) {
+            cleanup();
+            return;
+          }
+          if (opcode === 0x9) writeWsFrame(socket, 0xA, payload);
+        }
+      } catch {
+        cleanup();
+      }
     });
 
     record({ kind: 'events-ws', device: device.id, ip, recent: eventBus?.getRecent(1).length ?? 0 });
@@ -407,28 +441,37 @@ function isLoopback(address) {
 }
 
 /**
+ * 写一个 unmasked 的服务端 WebSocket 帧。
+ * @param {import('node:net').Socket} socket
+ * @param {number} opcode - 1=文本，0xA=pong，0x8=close
+ * @param {Buffer} payload
+ */
+function writeWsFrame(socket, opcode, payload) {
+  const length = payload.length;
+  let header;
+  if (length < 126) {
+    header = Buffer.from([0x80 | opcode, length]);
+  } else if (length < 65536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x80 | opcode;
+    header[1] = 126;
+    header.writeUInt16BE(length, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x80 | opcode;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(length), 2);
+  }
+  socket.write(Buffer.concat([header, payload]));
+}
+
+/**
  * 写一个 unmasked 的服务端 WebSocket 文本帧（本 daemon 只做服务端推送）。
  * @param {import('node:net').Socket} socket
  * @param {string} text
  */
 function writeWsText(socket, text) {
-  const payload = Buffer.from(text, 'utf8');
-  const length = payload.length;
-  let header;
-  if (length < 126) {
-    header = Buffer.from([0x81, length]);
-  } else if (length < 65536) {
-    header = Buffer.alloc(4);
-    header[0] = 0x81;
-    header[1] = 126;
-    header.writeUInt16BE(length, 2);
-  } else {
-    header = Buffer.alloc(10);
-    header[0] = 0x81;
-    header[1] = 127;
-    header.writeBigUInt64BE(BigInt(length), 2);
-  }
-  socket.write(Buffer.concat([header, payload]));
+  writeWsFrame(socket, 0x1, Buffer.from(text, 'utf8'));
 }
 
 function sendJson(res, status, value) {

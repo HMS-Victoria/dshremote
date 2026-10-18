@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.2.2';
+const VERSION = '0.2.5';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -189,7 +189,7 @@ function installViewportClass() {
   query.addEventListener?.('change', sync);
 }
 
-/** 点击会话项 / 新建会话后自动收起抽屉。 */
+/** 点击会话项 / 新建会话 / 插件 / 自动化任务后自动收起抽屉（这些会在主区域打开面板）。 */
 function installAutoClose() {
   document.addEventListener('click', (event) => {
     if (!isDrawerOpen()) return;
@@ -197,7 +197,9 @@ function installAutoClose() {
     if (target === null) return;
     const inSidebar = target.closest(SIDEBAR_SELECTOR);
     if (inSidebar === null) return;
-    const clickedSession = target.closest('[class*="sessionRow"], [class*="_newSession"]');
+    const clickedSession = target.closest(
+      '[class*="sessionRow"], [class*="_newSession"], [class*="_panelRow"], [class*="_brand"]',
+    );
     if (clickedSession === null) return;
     setTimeout(() => {
       if (isDrawerOpen()) toggleDrawer();

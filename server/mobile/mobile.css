@@ -373,6 +373,51 @@ html.dsh-mobile [class*="_newSession"] {
   min-height: 42px;
 }
 
+/* 新会话输入区占位文案：窄屏保持单行省略，避免换行导致视觉错位 */
+html.dsh-mobile [class*="RlGAzG_placeholder"] {
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+}
+
+/* 模型选择器：窄屏时给模型名留空间，省略号收尾；挤不下的推理等级先隐藏 */
+html.dsh-mobile [class*="RlGAzG_trailing"] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  justify-content: flex-end !important;
+}
+
+html.dsh-mobile [class*="RlGAzG_standardControls"],
+html.dsh-mobile [class*="wq12jW_root"],
+html.dsh-mobile [class*="wq12jW_trigger"] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  justify-content: flex-end !important;
+}
+
+html.dsh-mobile [class*="wq12jW_triggerLabel"] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: right !important;
+}
+
+html.dsh-mobile [class*="wq12jW_triggerEffort"] {
+  display: none !important;
+}
+
+/* 插件 / 自动化任务等整页界面：给左上角悬浮菜单按钮让出位置 */
+html.dsh-mobile [class*="fO69Vq_pageHead"] {
+  padding-left: calc(56px + var(--dsh-safe-left)) !important;
+}
+
+html.dsh-mobile [class*="fO69Vq_page"] {
+  padding-top: var(--dsh-safe-top) !important;
+}
+
 /* 代码块横向滚动，不撑破布局 */
 html.dsh-mobile pre,
 html.dsh-mobile code {

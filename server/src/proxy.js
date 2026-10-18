@@ -9,6 +9,7 @@ import net from 'node:net';
 import { createHash } from 'node:crypto';
 import { deviceCookie } from './auth.js';
 import { injectHtml, pairPageHtml, serveMobileAsset } from './inject.js';
+import { lanUrls } from './net.js';
 
 const PAIR_API_PATH = '/__dshremote/pair';
 const HEALTH_PATH = '/__dshremote/health';
@@ -136,13 +137,40 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     if (!device) {
       if (wantsHtml(req)) {
         record({ kind: 'unauthorized', path: pathname, ip: clientKey(req) });
+        const pairing = currentPairingForPage();
         res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(pairPageHtml());
+        res.end(pairPageHtml({ pairUrl: `${pairBaseUrl(req)}/pair?code=${pairing.code}` }));
         return;
       }
       return sendJson(res, 401, { ok: false, error: 'unauthorized' });
     }
     return forward(req, res, device);
+  }
+
+  /** 配对页展示用：确保当前有一个未使用、未过期的配对码（过期则自动轮换）。 */
+  function currentPairingForPage() {
+    const current = devices.pairing;
+    const expired = current !== null && current.expiresAt !== null && Date.now() > current.expiresAt;
+    if (current !== null && current.usedAt == null && !expired) return current;
+    const next = devices.newPairingCode();
+    log(`[auth] 配对页访问，生成新配对码: ${next.code}`);
+    onPairingChanged?.(next);
+    return next;
+  }
+
+  /**
+   * 二维码里要编码的访问地址：优先用请求 Host（手机浏览器访问时就是局域网地址；
+   * 电脑浏览器访问 127.0.0.1 时改用本机第一个局域网网卡地址）。
+   * @param {import('node:http').IncomingMessage} req
+   */
+  function pairBaseUrl(req) {
+    const host = String(req.headers.host ?? '');
+    const hostValid = /^[A-Za-z0-9.\-]+(:\d+)?$/u.test(host);
+    const isLoopbackHost = /^(127\.0\.0\.1|localhost)(:\d+)?$/iu.test(host);
+    if (hostValid && !isLoopbackHost) return `http://${host}`;
+    const lan = lanUrls(req.socket.localPort ?? 0)[0];
+    if (lan !== undefined) return lan.url;
+    return `http://${hostValid ? host : '127.0.0.1'}`;
   }
 
   /** 配对成功后：一次性配对码立即作废并轮换，并通知 daemon 更新配对信息文件。 */
@@ -182,8 +210,12 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
         return;
       }
     }
+    const current = currentPairingForPage();
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(pairPageHtml({ error: code ? '配对码不正确或已过期' : null }));
+    res.end(pairPageHtml({
+      error: code ? '配对码不正确或已过期' : null,
+      pairUrl: `${pairBaseUrl(req)}/pair?code=${current.code}`,
+    }));
   }
 
   async function handlePairApi(req, res) {

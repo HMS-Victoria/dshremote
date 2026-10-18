@@ -368,8 +368,8 @@ export async function serveMobileAsset(pathname, res) {
   res.end(body);
 }
 
-/** 配对页（浏览器）。 */
-export function pairPageHtml({ error = null, code = null } = {}) {
+/** 配对页（浏览器）。pairUrl 存在时显示扫码二维码。 */
+export function pairPageHtml({ error = null, code = null, pairUrl = null } = {}) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -387,6 +387,12 @@ export function pairPageHtml({ error = null, code = null } = {}) {
   .card { width: min(420px, 100%); background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 28px 24px; }
   h1 { font-size: 20px; margin: 0 0 8px; }
   p { color: #8b949e; font-size: 14px; line-height: 1.6; margin: 0 0 16px; }
+  .qr-wrap { display: grid; place-items: center; gap: 10px; margin: 4px 0 18px; }
+  #qr { background: #fff; padding: 10px; border-radius: 12px; line-height: 0; }
+  #qr svg { display: block; width: 200px; height: 200px; }
+  .qr-hint { color: #6e7681; font-size: 12px; margin: 0; text-align: center; }
+  .or { display: flex; align-items: center; gap: 10px; color: #6e7681; font-size: 12px; margin: 4px 0 14px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: #30363d; }
   input {
     width: 100%; padding: 14px 16px; font-size: 22px; letter-spacing: 6px; text-align: center;
     background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 12px; outline: none;
@@ -405,14 +411,35 @@ export function pairPageHtml({ error = null, code = null } = {}) {
 <body>
   <main class="card">
     <h1>连接 DeepSeek Harness</h1>
-    <p>在电脑上启动 dshremote 后，控制台会打印 6 位配对码。输入即可让这台设备访问 DSH。</p>
+    <p>${pairUrl ? '用手机 App 扫码即可配对；也可以手动输入配对码（一次性，配对后自动轮换）。' : '在电脑上启动 dshremote 后，控制台会打印 6 位配对码。输入即可让这台设备访问 DSH。'}</p>
+    ${pairUrl ? `
+    <div class="qr-wrap">
+      <div id="qr" data-url="${escapeHtml(pairUrl)}" aria-label="配对二维码"></div>
+      <p class="qr-hint">手机 App → 切换服务器 → 扫码配对</p>
+    </div>
+    <div class="or">或手动输入配对码</div>` : ''}
     <form method="get" action="/pair">
-      <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" value="${code ? escapeHtml(code) : ''}" autofocus />
+      <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" value="${code ? escapeHtml(code) : ''}" ${pairUrl ? '' : 'autofocus'} />
       <button type="submit">连接</button>
     </form>
     ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
-    <p class="hint">配对成功后，本设备会获得一个长期令牌。电脑上的 <code>.data/devices.json</code> 可查看/撤销。</p>
+    <p class="hint">配对成功后，本设备会获得一个长期令牌。电脑上运行 <code>.\\tools\\devices.ps1</code> 可查看/吊销设备。</p>
   </main>
+  <script src="/__dshremote/qr.js"></script>
+  <script>
+    (function () {
+      try {
+        var holder = document.getElementById('qr');
+        if (!holder || typeof qrcode !== 'function') return;
+        var url = holder.getAttribute('data-url');
+        if (!url) return;
+        var qr = qrcode(0, 'M');
+        qr.addData(url);
+        qr.make();
+        holder.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, alt: '配对二维码' });
+      } catch (error) { /* QR 渲染失败时仍可手动输入配对码 */ }
+    })();
+  </script>
 </body>
 </html>`;
 }

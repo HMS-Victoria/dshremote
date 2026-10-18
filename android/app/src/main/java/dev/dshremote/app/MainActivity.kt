@@ -9,14 +9,18 @@ import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import dev.dshremote.app.ui.DshRemoteTheme
 import dev.dshremote.app.ui.PairScreen
+import dev.dshremote.app.ui.ScannerScreen
 import dev.dshremote.app.ui.WebViewScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,48 +48,65 @@ class MainActivity : ComponentActivity() {
                 var paired by remember { mutableStateOf(store.paired) }
                 var error by remember { mutableStateOf<String?>(null) }
                 var busy by remember { mutableStateOf(false) }
+                var scannerOpen by remember { mutableStateOf(false) }
+                var scannedUrl by remember { mutableStateOf<String?>(null) }
                 val scope = rememberCoroutineScope()
 
-                if (paired) {
-                    WebViewScreen(
-                        serverUrl = store.serverUrl.orEmpty(),
-                        token = store.deviceToken.orEmpty(),
-                        pendingSessionId = pendingSessionId.value,
-                        onSessionOpened = { pendingSessionId.value = null },
-                        onSwitchServer = {
-                            store.clear()
-                            EventService.stop(this)
-                            paired = false
-                            error = null
-                        },
-                    )
-                } else {
-                    PairScreen(
-                        initialServerUrl = store.lastServerUrl.ifBlank { "http://192.168.1.10:7801" },
-                        initialCode = store.lastPairCode,
-                        error = error,
-                        busy = busy,
-                        onConnect = { rawServer, code ->
-                            error = null
-                            busy = true
-                            scope.launch {
-                                try {
-                                    val server = PairingClient.normalizeBaseUrl(rawServer)
-                                    val result = withContext(Dispatchers.IO) {
-                                        PairingClient().pair(server, code)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (paired) {
+                        WebViewScreen(
+                            serverUrl = store.serverUrl.orEmpty(),
+                            token = store.deviceToken.orEmpty(),
+                            pendingSessionId = pendingSessionId.value,
+                            onSessionOpened = { pendingSessionId.value = null },
+                            onSwitchServer = {
+                                store.clear()
+                                EventService.stop(this@MainActivity)
+                                paired = false
+                                error = null
+                            },
+                        )
+                    } else {
+                        PairScreen(
+                            initialServerUrl = store.lastServerUrl.ifBlank { "http://192.168.1.10:7801" },
+                            initialCode = store.lastPairCode,
+                            error = error,
+                            busy = busy,
+                            scannedUrl = scannedUrl,
+                            onScannedConsumed = { scannedUrl = null },
+                            onScan = { scannerOpen = true },
+                            onConnect = { rawServer, code ->
+                                error = null
+                                busy = true
+                                scope.launch {
+                                    try {
+                                        val server = PairingClient.normalizeBaseUrl(rawServer)
+                                        val result = withContext(Dispatchers.IO) {
+                                            PairingClient().pair(server, code)
+                                        }
+                                        store.save(server, result.token)
+                                        store.saveLastInputs(server, code)
+                                        paired = true
+                                        ensureEventService()
+                                    } catch (throwable: Throwable) {
+                                        error = throwable.message ?: "配对失败"
+                                    } finally {
+                                        busy = false
                                     }
-                                    store.save(server, result.token)
-                                    store.saveLastInputs(server, code)
-                                    paired = true
-                                    ensureEventService()
-                                } catch (throwable: Throwable) {
-                                    error = throwable.message ?: "配对失败"
-                                } finally {
-                                    busy = false
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
+
+                    if (scannerOpen) {
+                        ScannerScreen(
+                            onResult = { value ->
+                                scannedUrl = value
+                                scannerOpen = false
+                            },
+                            onClose = { scannerOpen = false },
+                        )
+                    }
                 }
             }
         }

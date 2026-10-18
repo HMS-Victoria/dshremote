@@ -152,46 +152,36 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 
 ---
 
-## 方案 E：EasyTier 组网（推荐：不暴露公网入口）
 
-EasyTier 是开源 P2P 组网工具：电脑和手机加入同一个「网络名 + 网络密码」的虚拟局域网，
-双方用 `10.126.126.x` 虚拟 IP 互通，**daemon 不需要暴露到公网**。
+---
 
-### 已完成的电脑端配置
+## 当前采用：Tailscale 私有网络（不开 Funnel）
 
-- EasyTier 程序：`tools\bin\easytier\easytier-windows-x86_64\`
-- 网络配置：`.data\easytier.json`（网络名/密码/虚拟 IP/公共节点）
-- 电脑虚拟 IP：`10.126.126.1`
-- daemon 的 `publicUrl` 已设为 `http://10.126.126.1:7801`，二维码直接用虚拟网地址；
-- 防火墙只放行了 EasyTier 网段（`10.126.126.0/24`）访问 7801。
-
-常用命令：
-
-```powershell
-.\tools\easytier.ps1 -Action status   # 查看本机虚拟 IP 和已连接节点
-.\tools\easytier.ps1 -Action up       # 启动（管理员 PowerShell）
-.\tools\easytier.ps1 -Action down     # 停止
-```
+> 2026-10-18 调整：不再使用 EasyTier（官方公共中继域名失效）和 Funnel（公网入口），
+> 手机与电脑登录同一个 Tailscale 账号组成私有网络，手机通过 100.x 访问 daemon。
 
 ### 手机端步骤
 
-1. 安装 EasyTier Android 版 APK（本项目 `dist\easytier-android-arm64-v2.6.4.apk`，
-   或从 <https://github.com/EasyTier/EasyTier/releases> 下载对应架构）；
-2. 打开 EasyTier → 添加网络：
-   - 网络名称/网络密码：填 `.data\easytier.json` 里的 `networkName` / `networkSecret`；
-   - 公共节点（peers）：`udp://public.easytier.cn:11010`（连不上可换
-     `tcp://public.easytier.cn:11010`）；
-   - 虚拟 IP：保持 DHCP/自动即可（会分到 `10.126.126.x`）；
-3. 连接后确认手机拿到了 `10.126.126.x` 地址；
-4. DSH Remote App → 切换服务器 → 地址填 `http://10.126.126.1:7801`；
-5. 电脑上 `.\tools\show-qr.ps1` 打开二维码页面，手机扫码配对
-   （虚拟网属于私有地址，**不需要**公网配对窗口）。
+1. 安装 Tailscale Android APK：本项目 `dist\tailscale-android-universal-1.104.1.apk`
+   （或从 <https://pkgs.tailscale.com/stable/#android> 下载）；
+2. 登录与电脑相同的 Tailscale 账号（电脑托盘里显示的账号）；
+3. 开启 VPN，确认手机拿到 `100.x` 地址；
+4. DSH Remote App → 切换服务器 → `http://100.101.102.103:7801` → 扫码配对
+   （私有网地址，无需公网配对窗口）；
+5. ⚠️ 手机 Tailscale 与梯子互斥，用 DSH 时先关梯子。
 
-> ⚠️ EasyTier 在 Android 上也是 VPN 应用：和梯子互斥，用 DSH 时先关梯子。
+### 电脑端状态
 
-### 安全说明
+- Tailscale Windows 客户端（服务自动启动，已登录，IP `100.101.102.103`）；
+- Funnel 已关闭：`tailscale funnel status` 应为 `No serve config`；
+- daemon `publicUrl` = `http://100.101.102.103:7801`，二维码/配对直接用这个地址；
+- 防火墙只放行 Tailscale 网段（`100.64.0.0/10`）访问 7801，宽泛的 Node.js 规则已禁用；
+- Clash TUN 的 fake-IP 会破坏 Tailscale 控制面连接，已用 hosts 指向真实 IP 解决
+  （原 hosts 备份在 `.data\hosts.backup`）；Tailscale 登录异常时先检查 hosts 里那几行。
 
-- 没有任何公网入口（别人扫不到你的 daemon）；
-- 只有知道「网络名 + 网络密码」的设备能加入虚拟网，密码请当作机密保管；
-- 可以后续把「Node.js JavaScript Runtime」的宽泛防火墙规则禁用，只保留 EasyTier 网段；
-- 公共节点只负责发现/中继，打洞成功时是 P2P 直连且流量加密。
+### EasyTier 为什么弃用
+
+官方免费共享节点域名 `public.easytier.cn` 已返回 NXDOMAIN（2026-10-18 实测），
+`config-server.easytier.cn` 连接也超时；没有公共中继就无法跨 NAT 组网（除非自建中继）。
+相关文件、防火墙规则和配置已清理。
+

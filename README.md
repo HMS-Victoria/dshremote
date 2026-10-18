@@ -16,7 +16,6 @@
 > 手机端添加工作区（在手机上浏览电脑目录并注册为工作区）；
 > 外网访问：[docs/network.md](docs/network.md)（Tailscale 组网，0 成本；或用 publicUrl 接 frp/域名）；
 > 安全加固 / 普通权限运行：[docs/security.md](docs/security.md)；
-> 外网/组网：EasyTier 虚拟局域网（不暴露公网）见 [docs/network.md](docs/network.md)；
 > 横屏/软键盘适配、断线提示横幅、DSH 黑鲸鱼应用图标。
 > 已支持：手机通知（审批/回合完成/错误）+ 点击通知打开对应会话；
 > daemon 一次性配对码、设备列表/吊销/清理、审计日志、后台与开机自启脚本。

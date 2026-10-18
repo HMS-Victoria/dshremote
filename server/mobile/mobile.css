@@ -903,3 +903,17 @@ html.dsh-mobile [class*="_scrollable"],
 html.dsh-mobile [class*="_zoneMenu"] {
   max-height: calc(var(--dshremote-vh, 100vh) - 24px) !important;
 }
+/* 问答交互卡（ask_user 的选项卡片）：max-height 用了 60vh，ArkWeb 里 vh=0 会塌掉 */
+html.dsh-mobile [class*="mAtvLq_card"] {
+  max-height: min(520px, calc(var(--dshremote-vh, 100vh) - 120px)) !important;
+}
+
+/* 聊天里可折叠内容体（含工具/交互详情）：max-height 用了 50vh */
+html.dsh-mobile [class*="WW4l1q_body"] {
+  max-height: min(400px, calc(var(--dshremote-vh, 100vh) - 200px)) !important;
+}
+
+/* 聊天时间轴/滚动相关的“会话视口高度”兜底（DSH 用 100dvh 作 fallback） */
+html.dsh-mobile {
+  --dsh-conversation-viewport-height: var(--dshremote-vh, 100dvh);
+}

@@ -250,9 +250,27 @@ const BOOT_INLINE = `
     try {
       return Array.prototype.map.call(document.querySelectorAll('[class*="_surface_ri079"]'), function (el) {
         var box = el.getBoundingClientRect();
+        var style = getComputedStyle(el);
+        var firstItem = el.querySelector('button');
+        var itemBox = firstItem ? firstItem.getBoundingClientRect() : null;
         return {
           rect: [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)],
-          text: (el.textContent || '').trim().slice(0, 26)
+          text: (el.textContent || '').trim().slice(0, 26),
+          style: {
+            height: style.height,
+            maxHeight: style.maxHeight,
+            display: style.display,
+            visibility: style.visibility,
+            opacity: style.opacity,
+            position: style.position,
+            overflow: style.overflow,
+            transform: style.transform,
+            csHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight
+          },
+          firstItemRect: itemBox
+            ? [Math.round(itemBox.x), Math.round(itemBox.y), Math.round(itemBox.width), Math.round(itemBox.height)]
+            : null
         };
       });
     } catch (error) { return []; }
@@ -271,6 +289,17 @@ const BOOT_INLINE = `
   }, true);
 
   // 上报视口尺寸，方便定位“底部被裁掉/滚动条错位”这类真机问题
+  function probeHeight(unit) {
+    try {
+      var probe = document.createElement('div');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:' + unit + ';visibility:hidden;pointer-events:none;';
+      (document.body || document.documentElement).appendChild(probe);
+      var value = probe.getBoundingClientRect().height;
+      probe.remove();
+      return Math.round(value);
+    } catch (error) { return null; }
+  }
+
   function reportViewport() {
     try {
       var viewport = window.visualViewport;
@@ -288,6 +317,8 @@ const BOOT_INLINE = `
           dpr: window.devicePixelRatio,
           screenW: window.screen ? window.screen.width : null,
           screenH: window.screen ? window.screen.height : null,
+          vh100: probeHeight('100vh'),
+          dvh100: probeHeight('100dvh'),
           vhVar: getComputedStyle(root).getPropertyValue('--dshremote-vh').trim()
         })
       });

@@ -437,6 +437,37 @@ html.dsh-mobile [class*="fO69Vq_page"] {
   padding-top: var(--dsh-safe-top) !important;
 }
 
+/* DSH 弹层（头像菜单/模型菜单/权限菜单）高度上限是用 100vh 算的：
+   max-height: calc(100vh - ...)。部分 WebView（华为 ArkWeb）里 100vh 会算成 0，
+   弹层内容高度被压成 0、只剩 8px 内边距 → 看起来“点了没反应”。
+   这里统一改用真实视口高度 --dshremote-vh（由注入脚本写入）兜底。 */
+html.dsh-mobile [class*="_scrollable_4ub78_19"] {
+  max-height: calc(var(--dshremote-vh, 100vh) - 24px) !important;
+}
+
+html.dsh-mobile [class*="_confirmation_cjd8z_1"] {
+  max-height: calc(var(--dshremote-vh, 100dvh) - 48px) !important;
+}
+
+/* 新建会话按钮：把 + 图标绝对定位到左侧，让“新会话”文字在按钮里真正居中
+   （原布局是“图标+文字”整体居中，导致文字视觉上偏右） */
+html.dsh-mobile [class*="_newSessionContent"] {
+  position: relative !important;
+  justify-content: center !important;
+}
+
+html.dsh-mobile [class*="_newSessionContent"] > svg {
+  position: absolute !important;
+  left: 10px !important;
+  top: 50% !important;
+  margin: 0 !important;
+  transform: translateY(-50%) !important;
+}
+
+html.dsh-mobile [class*="_newSessionShortcut"] {
+  display: none !important;
+}
+
 /* 代码块横向滚动，不撑破布局 */
 html.dsh-mobile pre,
 html.dsh-mobile code {

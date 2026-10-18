@@ -6,6 +6,7 @@
  */
 import http from 'node:http';
 import net from 'node:net';
+import { createHash } from 'node:crypto';
 import { deviceCookie } from './auth.js';
 import { injectHtml, pairPageHtml, serveMobileAsset } from './inject.js';
 
@@ -13,14 +14,19 @@ const PAIR_API_PATH = '/__dshremote/pair';
 const HEALTH_PATH = '/__dshremote/health';
 const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
+const EVENTS_PATH = '/__dshremote/events';
+const EVENTS_RECENT_PATH = '/__dshremote/events/recent';
 const DIAG_LIMIT = 1200;
+const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 /**
  * @param {object} options
  * @param {() => { origin: string, host: string, cookie: string }} options.getUpstream
  *   每次请求时读取当前上游（宿主可能被插件重新导出/重启，由 daemon 热切换）。
+ * @param {{ getRecent: (limit?: number) => object[], subscribe: (fn: (event: object) => void) => () => void }} [options.eventBus]
+ *   宿主事件总线（审批/轮次等），用于 `/__dshremote/events` 推送。
  */
-export function createProxy({ getUpstream, devices, log }) {
+export function createProxy({ getUpstream, devices, log, eventBus }) {
   const failures = new Map();
   const events = [];
 
@@ -68,6 +74,13 @@ export function createProxy({ getUpstream, devices, log }) {
     }
     if (pathname === CLIENT_LOG_PATH && req.method === 'POST') {
       return handleClientLog(req, res);
+    }
+    if (pathname === EVENTS_RECENT_PATH && req.method === 'GET') {
+      const device = devices.verifyCookie(req.headers.cookie);
+      if (!device) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      const requested = Number(url.searchParams.get('limit') ?? '20');
+      const limit = Number.isFinite(requested) ? Math.max(1, Math.min(100, Math.floor(requested))) : 20;
+      return sendJson(res, 200, { ok: true, events: eventBus?.getRecent(limit) ?? [] });
     }
     if (pathname.startsWith('/__dshremote/')) {
       return serveMobileAsset(pathname, res);
@@ -230,12 +243,76 @@ export function createProxy({ getUpstream, devices, log }) {
     req.pipe(proxyReq);
   }
 
+  /**
+   * 手机 App 的宿主事件通道（`/__dshremote/events`）。
+   * 握手完成后先发一条 hello（含最近事件），之后把总线上的新事件逐条推过去；
+   * 每 25s 发一次文本 ping 让 App 能判断连接是否还活着。
+   */
+  function handleDeviceEventsWs(req, socket, device, ip) {
+    if (!device) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    const key = req.headers['sec-websocket-key'];
+    if (typeof key !== 'string' || key === '') {
+      socket.destroy();
+      return;
+    }
+    const accept = createHash('sha1').update(`${key}${WS_GUID}`).digest('base64');
+    socket.write([
+      'HTTP/1.1 101 Switching Protocols',
+      'Upgrade: websocket',
+      'Connection: Upgrade',
+      `Sec-WebSocket-Accept: ${accept}`,
+    ].join('\r\n') + '\r\n\r\n');
+
+    let closed = false;
+    const send = (payload) => {
+      if (closed) return;
+      try {
+        writeWsText(socket, JSON.stringify(payload));
+      } catch {
+        cleanup();
+      }
+    };
+    const unsubscribe = eventBus === undefined
+      ? () => {}
+      : eventBus.subscribe((event) => send({ type: 'event', event }));
+    const heartbeat = setInterval(() => send({ type: 'ping', at: new Date().toISOString() }), 25_000);
+    if (typeof heartbeat.unref === 'function') heartbeat.unref();
+
+    function cleanup() {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeat);
+      try { unsubscribe(); } catch { /* ignore */ }
+      try { socket.end(); } catch { /* ignore */ }
+    }
+
+    socket.on('close', cleanup);
+    socket.on('error', cleanup);
+    socket.on('data', (chunk) => {
+      // 只关心客户端的 close 帧（opcode 0x8）；其余帧忽略（本通道是单向推送）。
+      const opcode = chunk.length > 0 ? (chunk[0] & 0x0f) : -1;
+      if (opcode === 0x8) cleanup();
+    });
+
+    record({ kind: 'events-ws', device: device.id, ip, recent: eventBus?.getRecent(1).length ?? 0 });
+    send({ type: 'hello', now: new Date().toISOString(), events: eventBus?.getRecent(20) ?? [] });
+  }
+
   function handleUpgrade(req, socket, head) {
     const device = devices.verifyCookie(req.headers.cookie);
     const ip = socket.remoteAddress ?? 'unknown';
     const ua = String(req.headers['user-agent'] ?? '').slice(0, 60);
     const origin = String(req.headers.origin ?? '').slice(0, 80);
     const startedAt = Date.now();
+    // 手机 App 的事件通道：由 daemon 自己实现 WebSocket，不转发给上游宿主。
+    if ((req.url ?? '').split('?')[0] === EVENTS_PATH) {
+      handleDeviceEventsWs(req, socket, device, ip);
+      return;
+    }
     record({
       kind: 'ws-upgrade',
       ip,
@@ -327,6 +404,31 @@ function clientKey(req) {
 
 function isLoopback(address) {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+/**
+ * 写一个 unmasked 的服务端 WebSocket 文本帧（本 daemon 只做服务端推送）。
+ * @param {import('node:net').Socket} socket
+ * @param {string} text
+ */
+function writeWsText(socket, text) {
+  const payload = Buffer.from(text, 'utf8');
+  const length = payload.length;
+  let header;
+  if (length < 126) {
+    header = Buffer.from([0x81, length]);
+  } else if (length < 65536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 126;
+    header.writeUInt16BE(length, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x81;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(length), 2);
+  }
+  socket.write(Buffer.concat([header, payload]));
 }
 
 function sendJson(res, status, value) {

@@ -12,7 +12,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { DATA_DIR, loadConfig } from './config.js';
 import { DeviceStore } from './auth.js';
-import { DshHost, ExportedHost, exportedHostPath } from './dsh-host.js';
+import { DshHost, ExportedHost, dshHomeDir, exportedHostPath } from './dsh-host.js';
+import { HostEventBus } from './host-events.js';
 import { createProxy } from './proxy.js';
 import { lanUrls } from './net.js';
 
@@ -96,7 +97,14 @@ async function main() {
   // 宿主可能被插件重新导出（桌面 DSH 重启），代理层每次请求都从这里取最新上游。
   const hostRef = { host, upstream };
 
-  const proxy = createProxy({ getUpstream: () => hostRef.upstream, devices, log });
+  // 宿主事件（审批 / 轮次 / 错误）：插件写 JSONL，daemon 跟随并推给手机 App。
+  const eventsProfile = upstream.profile ?? config.dsh.profile ?? 'desktop';
+  const eventsFile = config.hostEventsFile
+    || path.join(dshHomeDir(), 'remote', `events-${eventsProfile}.jsonl`);
+  const eventBus = new HostEventBus(eventsFile, log);
+  eventBus.start();
+
+  const proxy = createProxy({ getUpstream: () => hostRef.upstream, devices, log, eventBus });
   await new Promise((resolve, reject) => {
     proxy.once('error', reject);
     proxy.listen(config.listen.port, config.listen.host, resolve);
@@ -149,6 +157,7 @@ async function main() {
     stopping = true;
     log(`收到 ${signal}，正在关闭…`);
     proxy.close();
+    eventBus.stop();
     await hostRef.host.stop();
     log('已退出');
     process.exit(0);

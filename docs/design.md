@@ -28,6 +28,24 @@
 - 注意：desktop profile 只能由 Electron App 加载（CLI 启动会被拒绝：
   `profile "desktop" is managed exclusively by the Electron application`）。
 
+**M4.2 宿主事件通道（通知的数据源，服务端已完成）**
+
+- 插件 v0.2 额外订阅宿主事件，把值得通知的事件追加到
+  `~/.dsh/remote/events-<profile>.jsonl`：
+  - `session/event` 中的 `approval/asked` / `approval/decided` / `turn/start` / `turn/end`；
+  - `agent/error`；
+  - 只导出展示字段（会话 id/标题、工具名、原因、结果、错误摘要），**不含消息正文**；
+  - 用 mock cordis ctx 的离线单测验证了导出字段与过滤（`assistant/message` 不会导出）；
+- daemon 新增 `server/src/host-events.js`：1s 轮询跟随 JSONL（首次跳过历史），
+  100 条环形缓冲 + 订阅广播；Windows 下比 `fs.watch` 更稳；
+- 新增手机侧通道：
+  - `GET /__dshremote/events/recent?limit=N`（设备 cookie 鉴权）返回最近事件；
+  - `WS /__dshremote/events`（设备 cookie 鉴权）握手后先发 `hello`（含最近事件），
+    之后逐条 `{"type":"event","event":...}` 推送，25s 一次文本 `ping`；
+  - 调试工具 `tools/watch-events.mjs`（实时订阅 / `--poll` 拉取）。
+- 已实测：APPEND 事件 → daemon 跟随 → recent 接口与 WS 推送均正常；
+  事件文件在插件 v0.2 **下次随 DSH 重启加载**后开始产生真实事件。
+
 ### M3（2026-10-18）：Android 混合壳（MVP）
 
 - Gradle 工程（AGP 8.7.3 / Kotlin 2.0.21 / Compose BOM 2024.10 / JDK 21 / SDK 35，

@@ -1,6 +1,6 @@
 {
   "name": "dsh-remote-host",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "dshremote host bridge: export the running DSH host origin and authenticated URL so a LAN daemon (dshremote) can take over this host instead of spawning its own.",
   "type": "module",

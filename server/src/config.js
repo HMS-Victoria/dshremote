@@ -47,6 +47,8 @@ export const DEFAULTS = {
   hostProfile: 'desktop',
   /** 显式指定 host.json 路径（默认 <DSH_HOME>/remote/host-<hostProfile>.json） */
   hostFile: null,
+  /** 显式指定宿主事件日志路径（默认 <DSH_HOME>/remote/events-<profile>.jsonl） */
+  hostEventsFile: null,
   /** 是否在启动时打印所有局域网地址 */
   printLanUrls: true,
 };
@@ -72,6 +74,7 @@ function fromEnv(config) {
   if (env.DSHREMOTE_HOST_MODE) config.hostMode = env.DSHREMOTE_HOST_MODE;
   if (env.DSHREMOTE_HOST_PROFILE) config.hostProfile = env.DSHREMOTE_HOST_PROFILE;
   if (env.DSHREMOTE_HOST_FILE) config.hostFile = env.DSHREMOTE_HOST_FILE;
+  if (env.DSHREMOTE_HOST_EVENTS_FILE) config.hostEventsFile = env.DSHREMOTE_HOST_EVENTS_FILE;
   return config;
 }
 

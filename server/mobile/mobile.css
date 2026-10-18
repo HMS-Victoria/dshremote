@@ -105,7 +105,9 @@ html.dsh-mobile [class*="BynINW_sidebarCol"] {
   z-index: 100 !important;
   transform: translateX(-105%);
   transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
-  box-shadow: 10px 0 32px rgba(0, 0, 0, 0.45);
+  /* 不画投影：backdrop 已经区分抽屉与内容，投影在亮色内容上会形成一条黑边 */
+  box-shadow: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--dshremote-panel-bg) !important;
   overflow: hidden !important;
   padding-top: var(--dsh-safe-top) !important;
@@ -657,4 +659,20 @@ html.dsh-mobile.dsh-mobile-drawer-open .dshremote-status-row {
 
 .dshremote-status-row[data-state="off"] {
   border-color: rgba(248, 81, 73, 0.6);
+}
+/* 手机上显示会话行的操作按钮（桌面端靠 hover 显示；触屏没有指针）。
+   只显示「归档会话」「置顶会话」两个直接操作，hover 菜单按钮保留给桌面端。 */
+html.dsh-mobile [class*="sessionRow"] [class*="rowActions"] {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+}
+
+html.dsh-mobile [class*="sessionRow"] [class*="rowActions"] button[aria-label*="的操作"] {
+  display: none !important;
+}
+
+/* 操作按钮常显后，隐藏右侧时间，避免标题被挤得太短 */
+html.dsh-mobile [class*="sessionRow"] [class*="time"] {
+  display: none !important;
 }

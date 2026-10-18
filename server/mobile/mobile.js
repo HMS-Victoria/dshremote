@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.5';
+const VERSION = '0.3.7';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -210,6 +210,8 @@ function installAutoClose() {
     if (target === null) return;
     const inSidebar = target.closest(SIDEBAR_SELECTOR);
     if (inSidebar === null) return;
+    // 会话行右侧的「归档 / 置顶」按钮不打开会话，不要自动收起抽屉
+    if (target.closest('[class*="rowActions"]') !== null) return;
     const clickedSession = target.closest(
       '[class*="sessionRow"], [class*="_newSession"], [class*="_panelRow"], [class*="_brand"]',
     );
@@ -319,6 +321,37 @@ function installStatusRow() {
   update();
 }
 
+/**
+ * 会话行的「归档 / 置顶」按钮在触屏上常显（CSS 里强制 display），
+ * 但 DSH 行本身绑定了整行的 onClick（打开会话），点击按钮会冒泡到行 → 直接跳进对话。
+ * 这里在捕获阶段拦住这类点击，并直接调用按钮自己的 React onClick，避免触发整行跳转。
+ */
+function installRowActionClicks() {
+  const findReactProps = (el) => {
+    const key = Object.keys(el).find((name) => name.startsWith('__reactProps$'));
+    return key ? el[key] : null;
+  };
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target === null) return;
+    if (target.closest('[class*="rowActions"]') === null) return;
+    const button = target.closest('button');
+    if (button === null) return;
+    // 只处理会话行的操作按钮（编辑弹窗等其它 rowActions 保持原行为）
+    const row = button.closest('[class*="sessionRow"]');
+    if (row === null) return;
+    const props = findReactProps(button);
+    if (!props || typeof props.onClick !== 'function') return;
+    event.stopPropagation();
+    event.preventDefault();
+    try {
+      props.onClick(event);
+    } catch (error) {
+      /* 交回默认行为（会冒泡到行），至少不会卡死 */
+    }
+  }, true);
+}
+
 function init() {
   buildFab();
   installSidebarObserver();
@@ -328,6 +361,7 @@ function init() {
   installViewportClass();
   installConnectionBanner();
   installStatusRow();
+  installRowActionClicks();
   scheduleSync();
 
   // 原生外壳（Android）返回键：优先关闭抽屉/右栏，返回 true 表示已消费

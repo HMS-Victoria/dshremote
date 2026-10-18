@@ -93,7 +93,7 @@ html.dsh-mobile [class*="BynINW_sidebarCol"] {
   width: var(--dshremote-drawer-w) !important;
   max-width: var(--dshremote-drawer-w) !important;
   height: var(--dshremote-vh, 100dvh) !important;
-  z-index: 80 !important;
+  z-index: 100 !important;
   transform: translateX(-105%);
   transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
   box-shadow: 10px 0 32px rgba(0, 0, 0, 0.45);
@@ -163,7 +163,11 @@ html.dsh-mobile-drawer-open .dshremote-fab {
 
 .dshremote-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* 只遮住抽屉右侧区域，避免个别 WebView 的层叠差异让遮罩盖住抽屉内的按钮 */
+  left: var(--dshremote-drawer-w);
   z-index: 75;
   background: rgba(0, 0, 0, 0.5);
   opacity: 0;

@@ -230,6 +230,46 @@ const BOOT_INLINE = `
     });
   });
 
+  // 真机排查：记录关键按钮点击，以及点击后菜单是否出现（含位置）
+  function describeTarget(target) {
+    try {
+      if (!target || !target.closest) return null;
+      var el = target.closest('[aria-label], button, [role="menuitem"]');
+      if (!el) return null;
+      var box = el.getBoundingClientRect();
+      return {
+        aria: el.getAttribute('aria-label'),
+        cls: String(el.className).slice(0, 48),
+        text: (el.textContent || '').trim().slice(0, 16),
+        rect: [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)],
+        drawerOpen: document.documentElement.classList.contains('dsh-mobile-drawer-open')
+      };
+    } catch (error) { return null; }
+  }
+  function snapshotMenus() {
+    try {
+      return Array.prototype.map.call(document.querySelectorAll('[class*="_surface_ri079"]'), function (el) {
+        var box = el.getBoundingClientRect();
+        return {
+          rect: [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)],
+          text: (el.textContent || '').trim().slice(0, 26)
+        };
+      });
+    } catch (error) { return []; }
+  }
+  document.addEventListener('click', function (event) {
+    try {
+      var info = describeTarget(event.target);
+      if (info === null) return;
+      var interesting = /账号菜单|选择模型|访问模式|添加文件|设置/.test(info.aria || '');
+      if (!interesting && !info.drawerOpen) return;
+      report({ event: 'tap', message: JSON.stringify(info) });
+      setTimeout(function () {
+        report({ event: 'tap-menu', message: JSON.stringify({ aria: info.aria, menus: snapshotMenus() }) });
+      }, 420);
+    } catch (error) { /* ignore */ }
+  }, true);
+
   // 上报视口尺寸，方便定位“底部被裁掉/滚动条错位”这类真机问题
   function reportViewport() {
     try {

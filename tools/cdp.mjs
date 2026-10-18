@@ -20,7 +20,7 @@ import path from 'node:path';
 const EDGE_DEFAULT = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 
 function parseArgs(argv) {
-  const result = { width: 390, height: 844, wait: 8000, mobile: true, port: 9223 };
+  const result = { width: 390, height: 844, wait: 8000, mobile: true, port: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const key = argv[i];
     switch (key) {
@@ -67,6 +67,35 @@ async function waitForBrowser(port, timeoutMs = 20000) {
       await sleep(250);
     }
   }
+}
+
+/** 让操作系统分配一个空闲的调试端口，避免与残留进程冲突。 */
+async function getFreePort() {
+  const net = await import('node:net');
+  return await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+/** 结束整个浏览器进程树（Windows 下 Edge 会 fork 多个子进程）。 */
+async function killProcessTree(child) {
+  if (!child) return;
+  if (child.exitCode !== null) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve) => {
+      const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+      const timer = setTimeout(resolve, 5000);
+      killer.once('exit', () => { clearTimeout(timer); resolve(); });
+      killer.once('error', () => { clearTimeout(timer); child.kill(); resolve(); });
+    });
+    return;
+  }
+  child.kill('SIGKILL');
 }
 
 class CdpClient {
@@ -128,6 +157,7 @@ class CdpClient {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const edge = args.edge ?? EDGE_DEFAULT;
+  const port = args.port ?? await getFreePort();
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'dshremote-cdp-'));
   let browser;
   const client = { close() {} };
@@ -140,14 +170,14 @@ async function main() {
       '--no-sandbox',
       '--disable-extensions',
       '--hide-scrollbars',
-      `--remote-debugging-port=${args.port}`,
+      `--remote-debugging-port=${port}`,
       `--user-data-dir=${userDataDir}`,
       'about:blank',
     ], { stdio: 'ignore', windowsHide: true });
 
-    await waitForBrowser(args.port);
+    await waitForBrowser(port);
     const target = await fetchJson(
-      `http://127.0.0.1:${args.port}/json/new?${encodeURIComponent('about:blank')}`,
+      `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
       { method: 'PUT' },
     );
     const cdp = new CdpClient(target.webSocketDebuggerUrl);
@@ -323,13 +353,21 @@ async function main() {
     }
   } finally {
     client.close();
-    browser?.kill();
+    await killProcessTree(browser);
     await sleep(300);
     await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
+const watchdog = setTimeout(() => {
+  console.error('[cdp] 总超时（watchdog），强制退出');
+  process.exit(2);
+}, Number(process.env.CDP_TIMEOUT_MS ?? 240000));
+watchdog.unref?.();
+
 main().catch((error) => {
   console.error('[cdp] 失败:', error.message);
   process.exit(1);
+}).finally(() => {
+  clearTimeout(watchdog);
 });

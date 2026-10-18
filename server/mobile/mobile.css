@@ -154,7 +154,7 @@ html.dsh-mobile-drawer-open .dshremote-backdrop {
 /* ===== 主区域细节适配 ===== */
 
 /* 顶部 header 给悬浮按钮让出位置（会话页有标题栏） */
-html.dsh-mobile [class*="Dc7zOa_header"] {
+html.dsh-mobile [class~="Dc7zOa_header"] {
   padding-left: calc(58px + var(--dsh-safe-left)) !important;
 }
 
@@ -178,26 +178,7 @@ html.dsh-mobile [class*="Dc7zOa_crumbCurrent"] {
   min-width: 0 !important;
 }
 
-/* 当前会话名（右上角，避让 header 控件） */
-.dshremote-title {
-  position: fixed;
-  z-index: 95;
-  top: calc(50px + var(--dsh-safe-top));
-  right: calc(52px + var(--dsh-safe-right));
-  max-width: 44vw;
-  font-size: 12px;
-  line-height: 18px;
-  color: rgba(230, 237, 243, 0.62);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
 
-html.dsh-mobile-drawer-open .dshremote-title,
-html.dsh-mobile-right-open .dshremote-title {
-  display: none !important;
-}
 
 /* 输入区底部安全区 */
 html.dsh-mobile [class*="Dc7zOa_composerSeat"] {
@@ -224,8 +205,14 @@ html.dsh-mobile [class*="wq12jW_trigger"] {
   padding-right: 3px !important;
 }
 
-/* 底部状态条（轮数/token/上下文）允许横向滑动，避免被截断 */
+/* 底部状态条（轮数/token/上下文）：加大间距与留白，允许横向滑动 */
 html.dsh-mobile [class*="RlGAzG_dock"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 0 12px !important;
+  height: 30px !important;
+  font-size: 11px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
   scrollbar-width: none;
@@ -236,14 +223,134 @@ html.dsh-mobile [class*="RlGAzG_dock"]::-webkit-scrollbar {
 }
 
 html.dsh-mobile [class*="iq1doa_pill"],
-html.dsh-mobile [class*="iq1doa_anchor"],
-html.dsh-mobile [class*="iq1doa_label"] {
+html.dsh-mobile [class*="iq1doa_anchor"] {
   max-width: none !important;
+  flex: 0 0 auto !important;
+  padding: 0 8px !important;
+  height: 22px !important;
 }
 
 html.dsh-mobile [class*="iq1doa_label"] {
+  max-width: none !important;
   overflow: visible !important;
   text-overflow: clip !important;
+  font-size: 11px !important;
+}
+
+html.dsh-mobile [class*="iq1doa_icon"] {
+  margin-right: 4px !important;
+}
+
+html.dsh-mobile [class*="_2WTFBq_root"] {
+  flex: 0 0 auto !important;
+  font-size: 11px !important;
+}
+
+/* 窄屏状态条：隐藏上下文百分比前的环形图标，给文字让位 */
+html.dsh-mobile [class*="_2WTFBq_root"] svg {
+  display: none !important;
+}
+
+/* ===== 设置 / 弹窗类覆盖层适配 ===== */
+
+/* 设置面板：全屏 + 上下布局（导航横向 tabs） */
+html.dsh-mobile [class~="wCInkW_overlay"] {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+html.dsh-mobile [class~="wCInkW_panel"] {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  flex-direction: column !important;
+  padding-top: var(--dsh-safe-top) !important;
+  padding-bottom: var(--dsh-safe-bottom) !important;
+}
+
+html.dsh-mobile [class~="wCInkW_nav"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  flex: 0 0 auto !important;
+  flex-direction: column !important;
+  padding: 10px 12px 10px !important;
+  gap: 8px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html.dsh-mobile [class~="wCInkW_navTitle"] {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 2px 4px !important;
+  font-size: 20px !important;
+}
+
+html.dsh-mobile [class~="wCInkW_navList"] {
+  flex-direction: row !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+html.dsh-mobile [class~="wCInkW_navList"]::-webkit-scrollbar {
+  display: none;
+}
+
+html.dsh-mobile [class~="wCInkW_navCell"] {
+  width: auto !important;
+  min-width: max-content !important;
+  flex: 0 0 auto !important;
+  height: 38px !important;
+  padding: 0 14px !important;
+  border-radius: 10px !important;
+  gap: 6px !important;
+}
+
+/* 横向 tab 里图标必须保持固定尺寸，否则会被 flex 拉满 */
+html.dsh-mobile [class~="wCInkW_navIcon"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  flex: 0 0 16px !important;
+}
+
+html.dsh-mobile [class~="wCInkW_navLabel"] {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 0 0 auto !important;
+  font-size: 13px !important;
+}
+
+html.dsh-mobile [class~="wCInkW_content"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.dsh-mobile [class~="wCInkW_header"] {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+/* 设置面板打开时隐藏悬浮按钮 */
+html.dsh-mobile-modal-open .dshremote-fab {
+  display: none !important;
 }
 
 /* 会话列表：触控友好的行高与字号 */

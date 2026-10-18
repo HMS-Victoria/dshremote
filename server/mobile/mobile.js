@@ -24,7 +24,6 @@ function log(...args) {
 
 let fab = null;
 let backdrop = null;
-let titleChip = null;
 let sidebarObserver = null;
 let frameObserver = null;
 let bodyObserver = null;
@@ -41,6 +40,11 @@ function frame() {
 /** 右侧栏打开时 DSH 会给面板挂 data-sidebar-right-open（窄视口下自动全屏）。 */
 function isRightOpen() {
   return document.querySelector('[data-sidebar-right-open]') !== null;
+}
+
+/** 设置等模态覆盖层（wCInkW_overlay）。 */
+function isModalOpen() {
+  return document.querySelector('[class*="wCInkW_overlay"]') !== null;
 }
 
 /** 侧栏展开状态：优先读 frame 的 data-sidebar-collapsed，旧版本回退到 class。 */
@@ -65,9 +69,13 @@ function scheduleSync() {
 function syncDrawer() {
   const drawerOpen = isDrawerOpen();
   const rightPanelOpen = isRightOpen();
+  const modalOpen = isModalOpen();
   root.classList.toggle('dsh-mobile-drawer-open', drawerOpen);
   root.classList.toggle('dsh-mobile-right-open', rightPanelOpen);
+  root.classList.toggle('dsh-mobile-modal-open', modalOpen);
   if (fab !== null) fab.setAttribute('aria-expanded', String(drawerOpen));
+  // 打开设置等模态框时，顺手收起移动端抽屉，避免背后残留
+  if (modalOpen && drawerOpen) toggleDrawer();
 }
 
 function buildFab() {
@@ -96,24 +104,6 @@ function buildFab() {
     else closeRightBar();
   });
   document.body.appendChild(backdrop);
-
-  titleChip = document.createElement('div');
-  titleChip.className = 'dshremote-title';
-  document.body.appendChild(titleChip);
-  const titleElement = document.querySelector('title');
-  if (titleElement !== null) {
-    new MutationObserver(updateTitleChip).observe(titleElement, { childList: true, characterData: true, subtree: true });
-  }
-  updateTitleChip();
-}
-
-/** 右上角显示当前会话名（来自 document.title）。 */
-function updateTitleChip() {
-  if (titleChip === null) return;
-  const raw = (document.title || '').replace(/\s+[—-]\s+DeepSeek Harness\s*$/u, '').trim();
-  const meaningful = raw !== '' && raw !== 'DeepSeek Harness';
-  titleChip.textContent = meaningful ? raw : '';
-  titleChip.style.display = meaningful ? '' : 'none';
 }
 
 function toggleDrawer() {
@@ -149,12 +139,14 @@ function installSidebarObserver() {
   scheduleSync();
 }
 
-/** DSH 打开右侧栏时会挂 data-sidebar-right-open；窄视口下自动全屏。 */
+/** DSH 打开右侧栏时会挂 data-sidebar-right-open；窄视口下自动全屏。
+ *  设置等模态框出现/消失通过 childList 侦测。 */
 function installBodyObserver() {
   if (bodyObserver !== null) return;
   bodyObserver = new MutationObserver(scheduleSync);
   bodyObserver.observe(document.body, {
     subtree: true,
+    childList: true,
     attributes: true,
     attributeFilter: ['data-sidebar-right-open', 'data-sidebar-collapsed', 'data-rightbar-collapsed', 'data-rightbar-fullscreen'],
   });

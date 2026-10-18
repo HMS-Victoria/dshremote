@@ -18,6 +18,19 @@
   - 宿主会把新工作区推送给已连接的界面，侧边栏自动刷新，并弹出「已添加工作区」提示；
   - 已端到端验证（新建→在手机上添加→侧边栏出现→通过 `workspace/delete` 清理）。
 
+### M6.1（2026-10-18）：ArkWeb `vh=0` 遗留问题收尾
+
+华为 ArkWeb 会把 `vh`/`dvh` 算成 0，导致所有用它们算高度上限的弹层塌陷/溢出屏幕。
+已统一改成真实视口高度 `--dshremote-vh`（由注入脚本写入）：
+
+- 添加工作区弹层：`max-height` 用 `78%` 而不是 `vh`；
+- 会话行操作、遮罩、抽屉描边：顺带修掉“黑边”；
+- **问答选项卡**（ask_user 的选项卡片，原 `max-height: min(60vh, 520px)`）：
+  改为 `min(520px, var(--dshremote-vh) - 120px)`，真机验证选项完整显示在屏幕内；
+- 聊天可折叠内容体（原 `min(400px, 50vh)`）改为按真实视口高度计算；
+- 通用兜底：所有 `_menu / _popover / _dialog / _panel / _scrollable / _zoneMenu`
+  的高度上限统一用 `--dshremote-vh`；`--dsh-conversation-viewport-height` 也提供兜底值。
+
 ### M5（2026-10-18）：体验细节与应用图标
 
 - **应用图标**：改用官方 DSH 「鲸鱼」标（从 DSH 前端 `FISH_LOGO_PATH` 提取路径，

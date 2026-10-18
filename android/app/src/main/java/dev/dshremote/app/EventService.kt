@@ -74,41 +74,44 @@ class EventService : Service() {
     // ── 连接管理 ────────────────────────────────────────────────────────────
 
     private fun connect() {
-        val server = store.serverUrl
-        val token = store.deviceToken
-        if (server.isNullOrEmpty() || token.isNullOrEmpty()) {
-            stopSelf()
-            return
+        // 探测所有候选地址（局域网/Tailscale），选择当前网络下可用的那个
+        scope.launch {
+            val server = ServerResolver.resolve(this@EventService)
+            val token = store.deviceToken
+            if (server.isEmpty() || token.isNullOrEmpty()) {
+                stopSelf()
+                return@launch
+            }
+            val wsUrl = eventsUrl(server) ?: run {
+                stopSelf()
+                return@launch
+            }
+            socket?.cancel()
+            updateServiceNotification("正在连接 ${Uri.parse(server).host}…")
+            val request = Request.Builder()
+                .url(wsUrl)
+                .header("Cookie", "dshremote_device=$token")
+                .build()
+            socket = client.newWebSocket(request, object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    attempt = 0
+                    updateServiceNotification("已连接：审批/回合事件监听中")
+                }
+
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    handleMessage(text)
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    scheduleReconnect()
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    updateServiceNotification("连接断开，重试中…")
+                    scheduleReconnect()
+                }
+            })
         }
-        val wsUrl = eventsUrl(server) ?: run {
-            stopSelf()
-            return
-        }
-        socket?.cancel()
-        updateServiceNotification("正在连接 ${Uri.parse(server).host}…")
-        val request = Request.Builder()
-            .url(wsUrl)
-            .header("Cookie", "dshremote_device=$token")
-            .build()
-        socket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                attempt = 0
-                updateServiceNotification("已连接：审批/回合事件监听中")
-            }
-
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                handleMessage(text)
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                scheduleReconnect()
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                updateServiceNotification("连接断开，重试中…")
-                scheduleReconnect()
-            }
-        })
     }
 
     private fun scheduleReconnect() {

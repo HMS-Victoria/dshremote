@@ -185,3 +185,17 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 `config-server.easytier.cn` 连接也超时；没有公共中继就无法跨 NAT 组网（除非自建中继）。
 相关文件、防火墙规则和配置已清理。
 
+
+---
+
+## 局域网访问（与 Tailscale 并存）
+
+> 2026-10-18 起：同一局域网（Wi-Fi）也能直接连，不再只限 Tailscale。
+
+- 防火墙规则 `dshremote LAN TCP 7801`：只允许**本地子网**（LocalSubnet）访问 7801，
+  公网/其他网段仍然被拒；管理面板里有「局域网直连：已允许」开关（需要管理员权限）；
+- 手机 App **0.4.4+**：配对时 daemon 会返回所有可用地址（局域网 + Tailscale），
+  App 自动探测当前网络下可用的那个——在家用 Wi-Fi 走局域网，出门走 Tailscale，
+  不需要手动切换服务器；
+- 旧版 App：需要切换服务器地址时，手动改成 `http://<电脑局域网IP>:7801`（重新配对会自动复用设备名额）。
+

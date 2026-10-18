@@ -11,6 +11,13 @@ class SessionStore(context: Context) {
     val lastPairCode: String get() = prefs.getString("pair_code", "") ?: ""
     val lastServerUrl: String get() = prefs.getString("last_server_url", "") ?: ""
 
+    /** 配对时 daemon 返回的其它可用地址（局域网/Tailscale 等，换行分隔）。 */
+    val serverCandidates: List<String>
+        get() = (prefs.getString("server_candidates", "") ?: "")
+            .split('\n')
+            .map { it.trim().trimEnd('/') }
+            .filter { it.isNotEmpty() }
+
     val paired: Boolean get() = !serverUrl.isNullOrEmpty() && !deviceToken.isNullOrEmpty()
 
     /** 最近一次已通知的事件时间（ISO 字符串），用于服务重连后去重。 */
@@ -41,11 +48,16 @@ class SessionStore(context: Context) {
             prefs.edit().putBoolean("notify_turns", value).apply()
         }
 
-    fun save(serverUrl: String, token: String) {
+    fun save(serverUrl: String, token: String, candidates: List<String> = emptyList()) {
+        val normalized = (listOf(serverUrl) + candidates)
+            .map { it.trim().trimEnd('/') }
+            .filter { it.isNotEmpty() }
+            .distinct()
         prefs.edit()
             .putString("server_url", serverUrl)
             .putString("last_server_url", serverUrl)
             .putString("device_token", token)
+            .putString("server_candidates", normalized.joinToString("\n"))
             .apply()
     }
 

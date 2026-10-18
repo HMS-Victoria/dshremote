@@ -36,7 +36,7 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
  * @param {(pairing: object) => void} [options.onPairingChanged]
  *   配对码轮换（一次性码被使用 / 手动轮换）后的回调，daemon 用它更新配对信息文件。
  */
-export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase, publicUrl = null }) {
+export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase, publicUrl = null, pairServerUrls = null }) {
   const events = [];
   /**
    * 公网配对地址信息（来自 publicUrl）。
@@ -366,7 +366,28 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
       ok: true,
       token: issued.token,
       device: { id: issued.device.id, name: issued.device.name },
+      // 可用的服务器地址（Tailscale / 局域网等），App 可自动选择当前可达的那个
+      serverUrls: pairServerUrlList(req),
     });
+  }
+
+  /** 收集该 daemon 的所有可达地址（优先用请求 Host，其次局域网/Tailscale/publicUrl）。 */
+  function pairServerUrlList(req) {
+    const list = new Set();
+    // 手机端用不到的地址：本机回环、Clash 虚拟网卡
+    const skip = (url) => /^https?:\/\/(127\.|198\.18\.)/u.test(url);
+    const preferred = typeof preferPairBase === 'function' ? preferPairBase(req) : null;
+    if (typeof preferred === 'string' && preferred !== '' && !skip(preferred)) {
+      list.add(preferred.replace(/\/+$/u, ''));
+    }
+    const host = String(req.headers.host ?? '');
+    if (/^[A-Za-z0-9.\-]+(:\d+)?$/u.test(host) && !skip(`http://${host}`)) list.add(`http://${host}`);
+    if (typeof pairServerUrls === 'function') {
+      for (const url of pairServerUrls() ?? []) {
+        if (typeof url === 'string' && url !== '' && !skip(url)) list.add(url.replace(/\/+$/u, ''));
+      }
+    }
+    return [...list];
   }
 
   /** 页面内注入脚本上报的客户端诊断（WebSocket 关闭、JS 异常）。 */

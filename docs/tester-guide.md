@@ -6,7 +6,7 @@
 - **dsh-remote-host 插件**：装进 DSH 桌面版，让手机能接管桌面正在用的那个 Host；
 - **dshremote daemon**：一个小服务（Node.js），手机通过它连接电脑，默认端口 `7801`。
 
-手机端需要安装 `dist\dshremote-0.4.3-debug.apk`（本压缩包里已附带，版本信息见 `VERSION.txt`）。
+手机端需要安装 `dist\dshremote-0.4.4-debug.apk`（本压缩包里已附带，版本信息见 `VERSION.txt`）。
 如果解压后没有 `dist` 目录，说明这个包没有附带 APK，请向开发者索取。
 
 ---
@@ -46,7 +46,7 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\tools\show-qr.ps1
 ```
 
-手机端：安装 `dist\dshremote-0.4.3-debug.apk` → 打开 App → **扫码配对**（或手动输入配对码）。
+手机端：安装 `dist\dshremote-0.4.4-debug.apk` → 打开 App → **扫码配对**（或手动输入配对码）。
 
 > 如果第 1 步报「找不到 DSH 安装目录」，请找到 `DeepSeek Harness.exe` 所在目录，用：
 > `.\tools\install-remote-host-plugin.ps1 -DshDir "C:\Program Files\DeepSeek Harness"`
@@ -105,3 +105,4 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 - 这是开发中的测试版，功能可能不完整、可能崩溃，请勿用于重要数据；
 - 只建议在局域网或 Tailscale 等私有网络内测试，**不要**把 7801 端口直接暴露到公网；
 - 配对码是一次性的，配对成功后会自动换新码，不要截图外传。
+

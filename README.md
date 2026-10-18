@@ -17,7 +17,7 @@
 > - 文档：方案 [docs/design.md](docs/design.md)、组网 [docs/network.md](docs/network.md)、
 >   Android 构建 [android/README.md](android/README.md)。
 >
-> **APK**：`dist/dshremote-0.4.3-debug.apk`（debug 签名，直接安装）
+> **APK**：`dist/dshremote-0.4.4-debug.apk`（debug 签名，直接安装）
 >
 > **交付测试包**：`.\tools\package-pc.ps1` → `dist\dshremote-pc-0.4.3.zip`
 > （插件 + daemon + 工具脚本 + APK + 测试说明，解压即用）
@@ -46,7 +46,7 @@ DSH 桌面宿主
 
 1. 电脑：Tailscale 已登录（服务自动启动），daemon 由计划任务 `dshremote-daemon`
    在登录后自动后台启动；也可手动 `.\tools\start.ps1 -Background`。
-2. 手机：安装 Tailscale APK，登录**与电脑相同的账号**，开启 VPN（手机拿到 100.x 地址）。
+2. 手机：安装 Tailscale APK，登录**与电脑相同的账号**，开启 VPN（手机拿到 100.x 地址）；在家同一 Wi-Fi 也可以不走 Tailscale 直连（App 0.4.4+ 自动选择，见 docs/network.md）。
 3. 手机 DSH Remote App：服务器地址填 `http://<电脑 Tailscale IP>:7801`，配对码填
    `.\tools\pair-info.ps1` 里的 6 位码，或 `.\tools\show-qr.ps1` 扫码。
 4. 需要临时关闭远程入口时：手机断开 Tailscale 即可（没有公网端口暴露）。
@@ -86,4 +86,6 @@ DSH agent 能执行任意命令，**能访问 dshremote 就等价于能控制这
 设备令牌只存哈希、30 天过期、最多 5 台设备（同一手机重复配重复用名额）、
 防火墙仅放行 Tailscale 网段。仍建议：DSH 以普通用户/受限令牌运行
 （见 `docs/security.md`），不要把配对码/设备令牌发给他人。
+
+
 

@@ -5,7 +5,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class PairResult(val token: String, val deviceId: String?)
+data class PairResult(val token: String, val deviceId: String?, val serverUrls: List<String> = emptyList())
 
 class PairingClient {
     /**
@@ -62,7 +62,15 @@ class PairingClient {
             val token = json.optString("token")
             if (token.isBlank()) throw IOException("配对失败：服务器未返回令牌")
             val deviceId = json.optJSONObject("device")?.optString("id")
-            return PairResult(token, deviceId)
+            // daemon 返回的所有可达地址（局域网/Tailscale 等），用于之后自动选择
+            val serverUrls = mutableListOf<String>()
+            json.optJSONArray("serverUrls")?.let { array ->
+                for (index in 0 until array.length()) {
+                    val url = array.optString(index)
+                    if (url.isNotBlank()) serverUrls.add(url)
+                }
+            }
+            return PairResult(token, deviceId, serverUrls)
         } finally {
             connection.disconnect()
         }

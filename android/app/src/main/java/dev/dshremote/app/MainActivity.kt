@@ -12,6 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import dev.dshremote.app.ui.DshRemoteTheme
@@ -57,22 +60,41 @@ class MainActivity : ComponentActivity() {
                 var showConnHint by remember {
                     mutableStateOf(store.paired && !store.connMenuHintShown)
                 }
+                var activeServer by remember { mutableStateOf<String?>(null) }
                 val scope = rememberCoroutineScope()
+
+                LaunchedEffect(paired) {
+                    if (paired) {
+                        activeServer = withContext(Dispatchers.IO) {
+                            ServerResolver.resolve(this@MainActivity)
+                        }
+                    } else {
+                        activeServer = null
+                    }
+                }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (paired) {
-                        WebViewScreen(
-                            serverUrl = store.serverUrl.orEmpty(),
-                            token = store.deviceToken.orEmpty(),
-                            pendingSessionId = pendingSessionId.value,
-                            onSessionOpened = { pendingSessionId.value = null },
-                            onSwitchServer = {
-                                store.clear()
-                                EventService.stop(this@MainActivity)
-                                paired = false
-                                error = null
-                            },
-                        )
+                        val server = activeServer
+                        if (server.isNullOrEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        } else {
+                            WebViewScreen(
+                                serverUrl = server,
+                                token = store.deviceToken.orEmpty(),
+                                pendingSessionId = pendingSessionId.value,
+                                onSessionOpened = { pendingSessionId.value = null },
+                                onSwitchServer = {
+                                    store.clear()
+                                    EventService.stop(this@MainActivity)
+                                    paired = false
+                                    activeServer = null
+                                    error = null
+                                },
+                            )
+                        }
                     } else {
                         PairScreen(
                             initialServerUrl = store.lastServerUrl.ifBlank { "http://192.168.1.10:7801" },
@@ -96,7 +118,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                             PairingClient().pair(server, code, deviceName, deviceId)
                                         }
-                                        store.save(server, result.token)
+                                        store.save(server, result.token, result.serverUrls)
                                         store.saveLastInputs(server, code)
                                         paired = true
                                         ensureEventService()

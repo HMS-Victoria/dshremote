@@ -77,6 +77,33 @@ function Get-TailscaleSummary {
     }
 }
 
+function Get-LanRuleEnabled {
+    try {
+        # 用 netsh 查询（Get-NetFirewallRule 在这台机器上要 ~4 秒，会卡界面）
+        $output = (netsh advfirewall firewall show rule name="dshremote LAN TCP 7801" 2>&1 | Out-String)
+        if ($output -notmatch 'dshremote LAN TCP 7801') { return $false }
+        if ($output -match '(?m)^\s*(?:Enabled|已启用)\s*:\s*(\S+)') {
+            return ($Matches[1] -match '^(Yes|是)$')
+        }
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Set-LanRuleState {
+    param([bool]$Enabled)
+    $script = Join-Path $root 'tools\firewall-lan.ps1'
+    $argument = if ($Enabled) { '-Enable' } else { '-Disable' }
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script, $argument
+        ) -Wait
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show('修改防火墙需要管理员权限（会弹出 UAC 窗口）。', '提示')
+    }
+}
+
 function Get-AutostartState {
     try {
         $task = Get-ScheduledTask -TaskName 'dshremote-daemon' -ErrorAction Stop
@@ -293,7 +320,7 @@ $buttonCopyServer.Size = New-Object System.Drawing.Size(110, 32)
 $groupServer.Controls.Add($buttonCopyServer)
 
 $labelServerHint = New-Object System.Windows.Forms.Label
-$labelServerHint.Text = '手机需先连上同一 Tailscale 私有网络（App 开着 VPN）。'
+$labelServerHint.Text = '手机连同一 Tailscale 网络或同一 Wi-Fi；App 0.4.4+ 自动选择可用地址。'
 $labelServerHint.ForeColor = [System.Drawing.Color]::FromArgb(100, 116, 139)
 $labelServerHint.Location = New-Object System.Drawing.Point(16, 150)
 $labelServerHint.AutoSize = $true
@@ -343,6 +370,8 @@ $buttonFolder = New-Button '打开项目目录' 110
 $panelTools.Controls.Add($buttonFolder)
 $buttonTailscale = New-Button '打开 Tailscale' 110
 $panelTools.Controls.Add($buttonTailscale)
+$buttonLan = New-Button '局域网直连：检查中' 170
+$panelTools.Controls.Add($buttonLan)
 
 # ── 刷新逻辑 ────────────────────────────────────────────────────────────
 
@@ -361,6 +390,13 @@ function Refresh-Ui {
     $labelTailscale.Text = 'Tailscale：' + (Get-TailscaleSummary)
     $auto = Get-AutostartState
     $labelAutostart.Text = '开机自启：' + $auto.text
+    if (Get-LanRuleEnabled) {
+        $buttonLan.Text = '局域网直连：已允许'
+        $buttonLan.BackColor = [System.Drawing.Color]::FromArgb(22, 163, 74)
+    } else {
+        $buttonLan.Text = '局域网直连：未允许'
+        $buttonLan.BackColor = [System.Drawing.Color]::FromArgb(37, 99, 235)
+    }
 
     $pairing = Get-PairingInfo
     if ($pairing -and $pairing.code) {
@@ -460,6 +496,10 @@ $buttonTailscale.Add_Click({
     } else {
         Start-Process 'https://tailscale.com/download'
     }
+})
+$buttonLan.Add_Click({
+    Set-LanRuleState -Enabled (-not (Get-LanRuleEnabled))
+    Refresh-Ui
 })
 
 # 刷新定时器

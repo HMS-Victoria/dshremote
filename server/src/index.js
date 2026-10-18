@@ -188,6 +188,13 @@ async function main() {
     eventBus,
     preferPairBase: () => preferredPairBase,
     publicUrl: config.publicUrl ?? null,
+    pairServerUrls: () => {
+      const list = [];
+      for (const entry of urls) list.push(entry.url);
+      for (const entry of tailscale) list.push(entry.url);
+      if (config.publicUrl) list.push(config.publicUrl);
+      return list;
+    },
     onPairingChanged: (nextPairing) => {
       void writePairingInfo(nextPairing, 'rotated');
     },

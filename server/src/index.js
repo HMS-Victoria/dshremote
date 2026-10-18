@@ -112,6 +112,8 @@ async function main() {
   const devices = new DeviceStore(path.join(DATA_DIR, 'devices.json'), {
     codeTtlMs: config.pairing.codeTtlMs,
     oneTime: config.pairing.oneTime !== false,
+    deviceTtlMs: config.pairing.deviceTtlMs,
+    maxDevices: config.pairing.maxDevices,
     onAudit: audit,
   });
   await devices.load();
@@ -176,6 +178,7 @@ async function main() {
     log,
     eventBus,
     preferPairBase: () => preferredPairBase,
+    publicUrl: config.publicUrl ?? null,
     onPairingChanged: (nextPairing) => {
       void writePairingInfo(nextPairing, 'rotated');
     },
@@ -212,6 +215,11 @@ async function main() {
     log(` 二维码地址: ${preferredPairBase}/pair?code=${pairing.code}`);
   }
   log(` 配对码:   ${pairing.code}${devices.oneTime ? '（一次性，配对后自动轮换）' : ''}`);
+  log(` 配对码有效期: ${config.pairing.codeTtlMs === null ? '不过期' : `${Math.round(config.pairing.codeTtlMs / 60000)} 分钟`}`);
+  log(` 设备上限: ${devices.maxDevices} 台，令牌有效期 ${Math.round((config.pairing.deviceTtlMs ?? 0) / 86400000)} 天`);
+  if (config.publicUrl) {
+    log(' 公网配对: 关闭（配对新设备前运行 .\\tools\\pair-open.ps1 临时开启 5 分钟）');
+  }
   log('==============================================');
 
   await writeRuntimeInfo(upstream);

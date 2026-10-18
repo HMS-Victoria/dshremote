@@ -123,3 +123,29 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 4. 手机扫码即可。
 
 > 若穿透服务只给「IP:端口」，也可以直接填：`.\tools\set-public-url.ps1 -Url "http://1.2.3.4:12345"`。
+---
+
+## 公网暴露的安全配置（已内置）
+
+把 daemon 通过 Funnel/隧道发布到公网后，以下保护默认生效：
+
+- **公网配对窗口**：通过 `publicUrl` 域名访问 `/pair` 或配对接口时，默认**一律返回 403**。
+  需要给新设备配对时，在电脑上运行：
+  ```powershell
+  .\tools\pair-open.ps1          # 打开 5 分钟公网配对窗口并显示二维码
+  ```
+  窗口结束或配对成功后自动关闭。局域网/本机访问不受此限制。
+- **配对码**：默认一次性、**10 分钟过期**，配对成功立即轮换；
+- **限速**：配对尝试每 IP 5 次/分钟、全局 10 次/分钟，超限 429；失败/被拒会写审计日志；
+- **设备令牌**：服务端只存 **sha256 哈希**；令牌默认 **30 天过期**；最多 **5 台设备**；
+- **Cookie**：公网 https 域名下自动加 `Secure`；
+- **审计**：配对、吊销、过期、公网配对被拒、限速触发都写入 `.data/audit.log`；
+- `/__dshremote/health` 对公网只返回 `{"ok":true}`，不暴露上游/进程信息。
+
+### 日常使用建议
+
+1. 不需要远程访问时，关掉公网入口：`C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off`；
+2. 需要时才开 Funnel，用完关掉；
+3. 给别人测试/临时配对时，配对完立刻确认设备列表：`.\tools\devices.ps1`；
+4. 手机丢了立刻吊销：`.\tools\devices.ps1 -Revoke <id>`；
+5. 长期建议：DSH/daemon 不要用 Administrator 账户运行（当前是 Administrator，权限较高）。

@@ -33,7 +33,10 @@ $toolNames = @(
     'pair-info.ps1',
     'devices.ps1',
     'show-qr.ps1',
-    'diag.ps1'
+    'diag.ps1',
+    'pair-open.ps1',
+    'set-public-url.ps1',
+    'firewall-allow.ps1'
 )
 foreach ($name in $toolNames) {
     $source = Join-Path $root "tools\$name"

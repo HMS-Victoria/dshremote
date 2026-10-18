@@ -31,6 +31,22 @@ Write-Host (' 配对码: ' + $code) -ForegroundColor Green
 if ($livePairing -and $livePairing.used) {
     Write-Host ' （当前码已使用，一次性模式下会自动轮换）' -ForegroundColor Yellow
 }
+if ($livePairing -and $livePairing.expiresAt) {
+    $expires = ([datetime]$livePairing.expiresAt).ToLocalTime()
+    if ($expires -lt (Get-Date)) {
+        Write-Host (' （配对码已过期：' + $expires.ToString('HH:mm:ss') + '，重新生成请运行 .\tools\pair-open.ps1）') -ForegroundColor Yellow
+    } else {
+        Write-Host (' （有效期到 ' + $expires.ToString('HH:mm:ss') + '）') -ForegroundColor DarkGray
+    }
+}
+if ($livePairing -and $livePairing.publicUrl) {
+    if ($livePairing.publicPairAllowed) {
+        $until = ([datetime]$livePairing.publicPairWindowUntil).ToLocalTime().ToString('HH:mm:ss')
+        Write-Host (' 公网配对: 已开启（到 ' + $until + '）') -ForegroundColor Green
+    } else {
+        Write-Host ' 公网配对: 关闭（配对新设备前运行 .\tools\pair-open.ps1）' -ForegroundColor DarkGray
+    }
+}
 Write-Host ''
 
 $urls = @()
@@ -73,7 +89,8 @@ if ($alive) {
     if ($oneTime) { Write-Host ' 配对码一次性：配对成功后自动作废并轮换' -ForegroundColor DarkGray }
     try {
         $deviceCount = @((Invoke-RestMethod ('http://127.0.0.1:' + $port + '/__dshremote/devices') -TimeoutSec 3).devices).Count
-        Write-Host (' 已配对设备: ' + $deviceCount + ' 台（.\tools\devices.ps1 查看/吊销）') -ForegroundColor DarkGray
+        $maxDevices = if ($livePairing -and $livePairing.maxDevices) { $livePairing.maxDevices } else { 5 }
+        Write-Host (' 已配对设备: ' + $deviceCount + ' / ' + $maxDevices + ' 台（.\tools\devices.ps1 查看/吊销）') -ForegroundColor DarkGray
     } catch {
         # 设备数量查询失败不影响配对码显示
     }

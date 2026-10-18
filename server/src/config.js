@@ -31,12 +31,18 @@ export const DEFAULTS = {
     /** 宿主启动超时（毫秒） */
     startTimeoutMs: 120000,
   },
-  /** 配对 */
+  /** 配对与设备安全 */
   pairing: {
-    /** 配对码有效期（毫秒），默认 7 天；null 表示本进程内不过期 */
-    codeTtlMs: 7 * 24 * 60 * 60 * 1000,
+    /** 配对码有效期（毫秒），默认 10 分钟；null 表示本进程内不过期 */
+    codeTtlMs: 10 * 60 * 1000,
     /** 配对码是否一次性：配对成功后立即作废并轮换新码（默认 true） */
     oneTime: true,
+    /** 设备令牌有效期（毫秒），默认 30 天 */
+    deviceTtlMs: 30 * 24 * 60 * 60 * 1000,
+    /** 最多允许配对的设备数量 */
+    maxDevices: 5,
+    /** 公网配对窗口时长（毫秒），默认 5 分钟 */
+    publicPairWindowMs: 5 * 60 * 1000,
   },
   /**
    * 宿主接入模式：
@@ -83,6 +89,9 @@ function fromEnv(config) {
   if (env.DSHREMOTE_HOST_FILE) config.hostFile = env.DSHREMOTE_HOST_FILE;
   if (env.DSHREMOTE_HOST_EVENTS_FILE) config.hostEventsFile = env.DSHREMOTE_HOST_EVENTS_FILE;
   if (env.DSHREMOTE_PUBLIC_URL) config.publicUrl = env.DSHREMOTE_PUBLIC_URL;
+  if (env.DSHREMOTE_PAIRING_TTL_MS) config.pairing.codeTtlMs = Number(env.DSHREMOTE_PAIRING_TTL_MS);
+  if (env.DSHREMOTE_DEVICE_TTL_MS) config.pairing.deviceTtlMs = Number(env.DSHREMOTE_DEVICE_TTL_MS);
+  if (env.DSHREMOTE_MAX_DEVICES) config.pairing.maxDevices = Number(env.DSHREMOTE_MAX_DEVICES);
   return config;
 }
 

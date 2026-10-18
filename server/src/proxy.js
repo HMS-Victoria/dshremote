@@ -13,6 +13,7 @@ import { lanUrls } from './net.js';
 import { listDirectory } from './browse.js';
 
 const PAIR_API_PATH = '/__dshremote/pair';
+const PAIR_OPEN_WINDOW_PATH = '/__dshremote/pairing/open-window';
 const HEALTH_PATH = '/__dshremote/health';
 const DIAG_PATH = '/__dshremote/diag';
 const CLIENT_LOG_PATH = '/__dshremote/client-log';
@@ -35,9 +36,19 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
  * @param {(pairing: object) => void} [options.onPairingChanged]
  *   配对码轮换（一次性码被使用 / 手动轮换）后的回调，daemon 用它更新配对信息文件。
  */
-export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase }) {
-  const failures = new Map();
+export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase, publicUrl = null }) {
   const events = [];
+  /** 公网配对地址的 host（来自 publicUrl），用于识别“公网配对请求”。 */
+  const publicHost = (() => {
+    if (typeof publicUrl !== 'string' || publicUrl === '') return null;
+    try {
+      return new URL(publicUrl).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  })();
+  /** 配对尝试限速（全局 + 按 IP，滑动 60 秒窗口）。 */
+  const pairRate = { global: [], perIp: new Map() };
 
   /** 诊断环形缓冲：记录 WS 握手/关闭、客户端上报与 API 请求，供 /__dshremote/diag 查看。 */
   const record = (event) => {
@@ -71,6 +82,9 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     const pathname = url.pathname;
 
     if (pathname === HEALTH_PATH) {
+      // 公网不暴露上游/进程信息，只回一个存活标记
+      const ip = req.socket.remoteAddress ?? '';
+      if (!isLoopback(ip)) return sendJson(res, 200, { ok: true });
       return sendJson(res, 200, { ok: true, upstream: getUpstream().origin, pid: process.pid });
     }
     if (pathname === DIAG_PATH) {
@@ -119,6 +133,35 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
         expiresAt: pairing?.expiresAt ?? null,
         used: pairing?.usedAt !== null && pairing?.usedAt !== undefined,
         oneTime: devices.oneTime,
+        publicUrl: publicUrl ?? null,
+        publicPairAllowed: devices.publicPairAllowed(),
+        publicPairWindowUntil: devices.publicPairWindowUntil > 0 ? new Date(devices.publicPairWindowUntil).toISOString() : null,
+        deviceCount: devices.listDevices().length,
+        maxDevices: devices.maxDevices,
+      });
+    }
+    if (pathname === PAIR_OPEN_WINDOW_PATH && req.method === 'POST') {
+      if (!isLoopback(req.socket.remoteAddress ?? '')) return sendJson(res, 403, { ok: false, error: 'loopback-only' });
+      const body = await readBody(req, 16 * 1024).catch(() => '');
+      let minutes = 5;
+      try {
+        const payload = JSON.parse(body || '{}');
+        if (Number.isFinite(Number(payload.minutes))) {
+          minutes = Math.max(1, Math.min(30, Math.round(Number(payload.minutes))));
+        }
+      } catch {
+        // 用默认 5 分钟
+      }
+      const { pairing, windowUntil } = devices.openPublicPairWindow(minutes * 60 * 1000);
+      log(`[auth] 已开启公网配对窗口（到 ${new Date(windowUntil).toLocaleTimeString()}，${minutes} 分钟），新配对码: ${pairing.code}`);
+      onPairingChanged?.(pairing);
+      return sendJson(res, 200, {
+        ok: true,
+        code: pairing.code,
+        expiresAt: pairing.expiresAt,
+        windowUntil: new Date(windowUntil).toISOString(),
+        minutes,
+        publicUrl: publicUrl ?? null,
       });
     }
     if (pathname === PAIRING_ROTATE_PATH && req.method === 'POST') {
@@ -202,27 +245,82 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     }
   }
 
+  /** 是否是经公网域名（publicUrl）到达的配对请求。 */
+  function isPublicPairRequest(req) {
+    if (publicHost === null) return false;
+    const host = String(req.headers.host ?? '').split(':')[0].toLowerCase();
+    if (host === publicHost) return true;
+    const forwarded = String(req.headers['x-forwarded-host'] ?? '').split(',')[0].trim().split(':')[0].toLowerCase();
+    return forwarded === publicHost;
+  }
+
+  /** 公网配对窗口没开时拒绝（页面/接口分别返回 HTML/JSON）。 */
+  function denyPublicPairing(req, res, asJson) {
+    devices.audit('pair.public-denied', { ip: clientKey(req), host: String(req.headers.host ?? '').slice(0, 120) });
+    const message = '公网配对未开启：请在电脑上运行 .\\tools\\pair-open.ps1（5 分钟内有效）后再试';
+    if (asJson) return sendJson(res, 403, { ok: false, error: 'public-pairing-disabled', message });
+    res.writeHead(403, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(pairPageHtml({ error: message }));
+    return undefined;
+  }
+
+  /** 配对尝试限速：每 IP 5 次/分钟，全局 10 次/分钟。 */
+  function pairRateLimited(req) {
+    const windowMs = 60_000;
+    const now = Date.now();
+    const prune = (list) => {
+      while (list.length > 0 && now - list[0] > windowMs) list.shift();
+    };
+    prune(pairRate.global);
+    const ip = clientKey(req);
+    const list = pairRate.perIp.get(ip) ?? [];
+    prune(list);
+    if (pairRate.global.length >= 10 || list.length >= 5) return true;
+    pairRate.global.push(now);
+    pairRate.perIp.set(ip, list);
+    list.push(now);
+    return false;
+  }
+
+  /** 公网 https 域名下给 Cookie 加 Secure。 */
+  function shouldSecureCookie(req) {
+    if (isSecure(req)) return true;
+    return publicHost !== null && /^https:/iu.test(String(publicUrl ?? '')) && isPublicPairRequest(req);
+  }
+
+  /** 配对成功后：关闭公网窗口、轮换配对码，返回是否成功。 */
+  function finishPairing() {
+    devices.closePublicPairWindow();
+    rotatePairingCode();
+  }
+
   async function handlePairPage(req, res, url) {
     const code = url.searchParams.get('code');
+    if (isPublicPairRequest(req) && !devices.publicPairAllowed()) {
+      return denyPublicPairing(req, res, false);
+    }
     if (code) {
+      if (pairRateLimited(req)) {
+        devices.audit('pair.rate-limited', { ip: clientKey(req), host: String(req.headers.host ?? '').slice(0, 120) });
+        res.writeHead(429, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(pairPageHtml({ error: '尝试次数过多，请稍后再试' }));
+        return;
+      }
       if (devices.pairingCodeValid(code)) {
-        const device = await devices.issueDevice('手机');
-        log(`[auth] 新设备配对: ${device.id} (${device.name})`);
-        rotatePairingCode();
+        const issued = await devices.issueDevice('手机');
+        if (issued === null) {
+          res.writeHead(409, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+          res.end(pairPageHtml({ error: `设备数量已达上限（最多 ${devices.maxDevices} 台），请先在电脑上运行 tools\\devices.ps1 -Revoke <id> 吊销旧设备` }));
+          return;
+        }
+        log(`[auth] 新设备配对: ${issued.device.id} (${issued.device.name})`);
+        finishPairing();
         res.writeHead(302, {
-          'set-cookie': deviceCookie(device.token, isSecure(req)),
+          'set-cookie': deviceCookie(issued.token, shouldSecureCookie(req)),
           location: '/',
           'cache-control': 'no-store',
         });
         res.end();
-        return;
-      }
-      const key = clientKey(req);
-      const count = (failures.get(key) ?? 0) + 1;
-      failures.set(key, count);
-      if (count > 20) {
-        res.writeHead(429, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(pairPageHtml({ error: '尝试次数过多，请稍后再试' }));
         return;
       }
     }
@@ -235,6 +333,13 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
   }
 
   async function handlePairApi(req, res) {
+    if (isPublicPairRequest(req) && !devices.publicPairAllowed()) {
+      return denyPublicPairing(req, res, true);
+    }
+    if (pairRateLimited(req)) {
+      devices.audit('pair.rate-limited', { ip: clientKey(req), host: String(req.headers.host ?? '').slice(0, 120) });
+      return sendJson(res, 429, { ok: false, error: 'rate-limited', message: '尝试次数过多，请稍后再试' });
+    }
     const body = await readBody(req, 64 * 1024);
     let payload;
     try {
@@ -245,13 +350,16 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     if (!devices.pairingCodeValid(payload.code)) {
       return sendJson(res, 403, { ok: false, error: 'invalid-code' });
     }
-    const device = await devices.issueDevice(payload.deviceName || 'Android');
-    log(`[auth] 新设备配对（API）: ${device.id} (${device.name})`);
-    rotatePairingCode();
+    const issued = await devices.issueDevice(payload.deviceName || 'Android');
+    if (issued === null) {
+      return sendJson(res, 409, { ok: false, error: 'device-limit', message: `设备数量已达上限（最多 ${devices.maxDevices} 台）` });
+    }
+    log(`[auth] 新设备配对（API）: ${issued.device.id} (${issued.device.name})`);
+    finishPairing();
     return sendJson(res, 200, {
       ok: true,
-      token: device.token,
-      device: { id: device.id, name: device.name },
+      token: issued.token,
+      device: { id: issued.device.id, name: issued.device.name },
     });
   }
 

@@ -27,6 +27,20 @@ class SessionStore(context: Context) {
             prefs.edit().putBoolean("conn_menu_hint_shown", value).apply()
         }
 
+    /** 通知开关：审批/错误提醒。 */
+    var notifyApproval: Boolean
+        get() = prefs.getBoolean("notify_approval", true)
+        set(value) {
+            prefs.edit().putBoolean("notify_approval", value).apply()
+        }
+
+    /** 通知开关：回合完成提醒。 */
+    var notifyTurns: Boolean
+        get() = prefs.getBoolean("notify_turns", true)
+        set(value) {
+            prefs.edit().putBoolean("notify_turns", value).apply()
+        }
+
     fun save(serverUrl: String, token: String) {
         prefs.edit()
             .putString("server_url", serverUrl)

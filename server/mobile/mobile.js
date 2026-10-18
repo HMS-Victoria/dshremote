@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.4';
+const VERSION = '0.3.5';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -288,6 +288,37 @@ function installConnectionBanner() {
   };
 }
 
+/**
+ * 抽屉底部的连接状态行：显示已连接/已断开，点按重连或打开原生连接菜单。
+ */
+function installStatusRow() {
+  if (document.querySelector('.dshremote-status-row') !== null) return;
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'dshremote-status-row';
+  row.innerHTML = '<span class="dshremote-status-dot"></span><span class="dshremote-status-text">连接中…</span>';
+  document.body.appendChild(row);
+
+  const label = row.querySelector('.dshremote-status-text');
+  row.addEventListener('click', () => {
+    const open = Number(window.__dshremoteWsState?.open) || 0;
+    if (open > 0 && typeof window.DshRemoteNative?.showMenu === 'function') {
+      window.DshRemoteNative.showMenu();
+    } else {
+      location.reload();
+    }
+  });
+
+  const update = () => {
+    const open = Number(window.__dshremoteWsState?.open) || 0;
+    row.dataset.state = open > 0 ? 'on' : 'off';
+    label.textContent = open > 0 ? '已连接 · 点按打开连接菜单' : '连接已断开 · 点按重连';
+  };
+  window.addEventListener('dshremote-ws-change', update);
+  setInterval(update, 3000);
+  update();
+}
+
 function init() {
   buildFab();
   installSidebarObserver();
@@ -296,6 +327,7 @@ function init() {
   installAutoClose();
   installViewportClass();
   installConnectionBanner();
+  installStatusRow();
   scheduleSync();
 
   // 原生外壳（Android）返回键：优先关闭抽屉/右栏，返回 true 表示已消费

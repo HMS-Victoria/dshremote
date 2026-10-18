@@ -163,6 +163,7 @@ class EventService : Service() {
         val title = event.optString("title").takeIf { it.isNotEmpty() }
         when (event.optString("kind")) {
             "approval" -> {
+                if (!store.notifyApproval) return
                 val tool = event.optString("toolName")
                 val reason = event.optString("reason")
                 val detail = listOf(tool, reason).filter { it.isNotEmpty() }.joinToString(" · ")
@@ -175,15 +176,19 @@ class EventService : Service() {
                 )
             }
 
-            "turn-end" -> notifyEvent(
-                CHANNEL_TURNS,
-                if (title != null) "回合完成：$title" else "回合完成",
-                "本轮已结束，点按查看结果",
-                sessionId,
-                high = false,
-            )
+            "turn-end" -> {
+                if (!store.notifyTurns) return
+                notifyEvent(
+                    CHANNEL_TURNS,
+                    if (title != null) "回合完成：$title" else "回合完成",
+                    "本轮已结束，点按查看结果",
+                    sessionId,
+                    high = false,
+                )
+            }
 
             "agent-error" -> {
+                if (!store.notifyApproval) return
                 val message = event.optString("message")
                 notifyEvent(
                     CHANNEL_APPROVAL,

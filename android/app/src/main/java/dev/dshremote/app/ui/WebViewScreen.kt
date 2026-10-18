@@ -18,9 +18,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,7 +35,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.dshremote.app.SessionStore
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
@@ -183,11 +193,47 @@ fun WebViewScreen(
         )
     }
 
+    // 通知开关（存 SharedPreferences，EventService 发通知前读取）
+    val settingsStore = remember { activity?.let { SessionStore(it) } }
+    var notifyApproval by remember { mutableStateOf(settingsStore?.notifyApproval ?: true) }
+    var notifyTurns by remember { mutableStateOf(settingsStore?.notifyTurns ?: true) }
+
     if (showMenu) {
         AlertDialog(
             onDismissRequest = { showMenu = false },
             title = { Text("连接") },
-            text = { Text(serverUrl) },
+            text = {
+                Column {
+                    Text(serverUrl)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    ) {
+                        Text("审批与错误提醒", modifier = Modifier.weight(1f), fontSize = 14.sp)
+                        Switch(
+                            checked = notifyApproval,
+                            onCheckedChange = {
+                                notifyApproval = it
+                                settingsStore?.notifyApproval = it
+                            },
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    ) {
+                        Text("回合完成提醒", modifier = Modifier.weight(1f), fontSize = 14.sp)
+                        Switch(
+                            checked = notifyTurns,
+                            onCheckedChange = {
+                                notifyTurns = it
+                                settingsStore?.notifyTurns = it
+                            },
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = {

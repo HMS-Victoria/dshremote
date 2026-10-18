@@ -618,3 +618,43 @@ html.dsh-mobile [class*="_9lTDKa_flatList"] {
     font-size: 16px;
   }
 }
+
+/* 抽屉底部连接状态行（mobile.js 注入） */
+.dshremote-status-row {
+  position: fixed;
+  left: 12px;
+  bottom: calc(72px + var(--dsh-safe-bottom));
+  z-index: 120;
+  display: none;
+  width: calc(var(--dshremote-drawer-w) - 24px);
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  background: rgba(22, 27, 34, 0.97);
+  color: #e6edf3;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+html.dsh-mobile.dsh-mobile-drawer-open .dshremote-status-row {
+  display: flex;
+}
+
+.dshremote-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3fb950;
+}
+
+.dshremote-status-row[data-state="off"] .dshremote-status-dot {
+  background: #f85149;
+}
+
+.dshremote-status-row[data-state="off"] {
+  border-color: rgba(248, 81, 73, 0.6);
+}

@@ -16,6 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import dev.dshremote.app.ui.DshRemoteTheme
@@ -50,6 +53,9 @@ class MainActivity : ComponentActivity() {
                 var busy by remember { mutableStateOf(false) }
                 var scannerOpen by remember { mutableStateOf(false) }
                 var scannedUrl by remember { mutableStateOf<String?>(null) }
+                var showConnHint by remember {
+                    mutableStateOf(store.paired && !store.connMenuHintShown)
+                }
                 val scope = rememberCoroutineScope()
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -107,6 +113,32 @@ class MainActivity : ComponentActivity() {
                             onClose = { scannerOpen = false },
                         )
                     }
+                }
+
+                // 首次连接时说明：返回键/长按左上角按钮可打开连接菜单
+                if (showConnHint) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            showConnHint = false
+                            store.connMenuHintShown = true
+                        },
+                        title = { Text("连接菜单") },
+                        text = {
+                            Text(
+                                "按「返回键」（或长按左上角按钮）可以打开连接菜单：" +
+                                    "刷新页面、切换服务器、设置、退出。\n\n" +
+                                    "连接断开时，点页面顶部横幅的「重试」也能重新连接。",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showConnHint = false
+                                    store.connMenuHintShown = true
+                                },
+                            ) { Text("知道了") }
+                        },
+                    )
                 }
             }
         }

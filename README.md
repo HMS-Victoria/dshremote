@@ -19,7 +19,7 @@
 > 完整方案见 [docs/design.md](docs/design.md)；Android 构建见
 > [android/README.md](android/README.md)。
 >
-> **APK**：`dist/dshremote-0.4.0-debug.apk`（debug 签名，直接安装）
+> **APK**：`dist/dshremote-0.4.1-debug.apk`（debug 签名，直接安装）
 
 ## 原理
 

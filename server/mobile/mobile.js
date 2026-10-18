@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.3';
+const VERSION = '0.3.4';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -253,9 +253,14 @@ function installConnectionBanner() {
     }
     const offline = navigator.onLine === false;
     const waitedLong = Date.now() - loadedAt > 8000;
+    const hasNativeMenu = typeof window.DshRemoteNative?.showMenu === 'function';
     let message = null;
     if (offline) message = '手机网络已断开';
-    else if (connectedOnce || waitedLong) message = '与电脑的连接已断开，正在重新连接…';
+    else if (connectedOnce || waitedLong) {
+      message = hasNativeMenu
+        ? '与电脑的连接已断开，正在重新连接…（按返回键可打开连接菜单）'
+        : '与电脑的连接已断开，正在重新连接…';
+    }
     if (message === null) {
       banner.dataset.visible = 'false';
       return;

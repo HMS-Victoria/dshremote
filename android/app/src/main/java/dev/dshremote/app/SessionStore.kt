@@ -20,6 +20,13 @@ class SessionStore(context: Context) {
             prefs.edit().putString("last_event_at", value).apply()
         }
 
+    /** 是否已经展示过“返回键/长按可打开连接菜单”的新手提示。 */
+    var connMenuHintShown: Boolean
+        get() = prefs.getBoolean("conn_menu_hint_shown", false)
+        set(value) {
+            prefs.edit().putBoolean("conn_menu_hint_shown", value).apply()
+        }
+
     fun save(serverUrl: String, token: String) {
         prefs.edit()
             .putString("server_url", serverUrl)

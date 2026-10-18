@@ -3,9 +3,9 @@
 # 用法：在项目根目录执行
 #   .\tools\package-pc.ps1                 # 打包（含 APK）
 #   .\tools\package-pc.ps1 -NoApk          # 不含 APK（更小的包）
-#   .\tools\package-pc.ps1 -Version 0.4.2  # 指定 APK 版本（默认 0.4.2）
+#   .\tools\package-pc.ps1 -Version 0.4.3  # 指定 APK 版本（默认 0.4.3）
 param(
-    [string]$Version = '0.4.2',
+    [string]$Version = '0.4.3',
     [switch]$NoApk
 )
 
@@ -47,6 +47,7 @@ foreach ($name in $toolNames) {
 # 测试说明 + 外网访问说明
 Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-测试说明.md')
 Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（Tailscale）.md')
+Copy-Item (Join-Path $root 'docs\security.md') (Join-Path $stage '安全说明.md')
 
 # APK（可选）
 if (-not $NoApk) {

@@ -81,3 +81,10 @@ C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off   # 关闭
 - 手机令牌泄漏：手机丢失请立刻 `.\tools\devices.ps1 -Revoke <id>`；
 - DSH 的「完全权限」预设会自动批准工具调用：不要让 Agent 处理不可信的网页/文件内容；
 - Tailscale 账号建议开启 2FA；`*.ts.net` 地址不要外传。
+
+## 五、开机自启（当前已配置）
+
+- **Tailscale**：Windows 服务自动启动（登录状态已保存），重启后无需手动操作；
+- **dshremote daemon**：计划任务 `dshremote-daemon`（登录后延迟 20 秒、受限权限后台启动），
+  查看/修改：`Get-ScheduledTask -TaskName dshremote-daemon`；
+- 登录 DSH 桌面版后 daemon 会自动以接管模式接入（`.\tools\pair-info.ps1` 可确认）。

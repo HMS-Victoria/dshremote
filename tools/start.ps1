@@ -1,4 +1,4 @@
-# 启动 dshremote daemon
+﻿# 启动 dshremote daemon
 # 用法：
 #   .\tools\start.ps1              # 前台运行（Ctrl+C 退出）
 #   .\tools\start.ps1 -Background  # 后台隐藏运行（日志写 .data\daemon.log）

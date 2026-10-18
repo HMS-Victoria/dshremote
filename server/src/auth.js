@@ -131,21 +131,54 @@ export class DeviceStore {
 
   /**
    * 配对成功：生成设备令牌并落盘。只保存哈希，原始令牌返回给调用方。
-   * @returns {Promise<{ device: object, token: string } | null>} 设备数超限时返回 null。
+   *
+   * 同一台手机重复配对时**复用**原设备条目（轮换令牌），不会新增设备：
+   *  - 优先按客户端上报的 deviceId 指纹匹配（新版 App 会发 Settings.Secure.ANDROID_ID）；
+   *  - 老版 App 没有 deviceId：按设备名兜底匹配（避免每次重连/重配都占一个名额）。
+   * @param {string} name 设备名（如 Pixel 7）
+   * @param {string|null} fingerprint 客户端稳定设备 ID（可空）
+   * @returns {Promise<{ device: object, token: string } | null>} 设备数超限且无法复用时返回 null。
    */
-  async issueDevice(name = 'Android') {
+  async issueDevice(name = 'Android', fingerprint = null) {
+    const fingerprintHash = typeof fingerprint === 'string' && fingerprint !== '' ? hashToken(fingerprint) : null;
+    const displayName = String(name || 'Android').slice(0, 40);
+    const token = randomBytes(24).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.deviceTtlMs).toISOString();
+    const now = new Date().toISOString();
+
+    // 找可复用的旧设备条目
+    let existing = null;
+    if (fingerprintHash !== null) {
+      existing = this.devices.find((entry) => entry.fingerprintHash === fingerprintHash) ?? null;
+    }
+    if (existing === null && fingerprintHash === null) {
+      // 老版 App：按设备名兜底（仅匹配同样没有指纹的旧条目，避免误伤新版 App 的多台同型号设备）
+      existing = this.devices.find((entry) => entry.name === displayName && !entry.fingerprintHash) ?? null;
+    }
+
+    if (existing !== null) {
+      existing.name = displayName;
+      existing.tokenHash = hashToken(token);
+      existing.expiresAt = expiresAt;
+      existing.lastSeenAt = now;
+      if (fingerprintHash !== null) existing.fingerprintHash = fingerprintHash;
+      await this.save();
+      this.audit('device.rekeyed', { deviceId: existing.id, name: existing.name, expiresAt });
+      return { device: existing, token };
+    }
+
     if (this.devices.length >= this.maxDevices) {
       this.audit('device.limit-reached', { maxDevices: this.maxDevices });
       return null;
     }
-    const token = randomBytes(24).toString('base64url');
     const device = {
       id: randomBytes(6).toString('hex'),
-      name: String(name || 'Android').slice(0, 40),
+      name: displayName,
       tokenHash: hashToken(token),
-      createdAt: new Date().toISOString(),
+      fingerprintHash,
+      createdAt: now,
       lastSeenAt: null,
-      expiresAt: new Date(Date.now() + this.deviceTtlMs).toISOString(),
+      expiresAt,
     };
     this.devices.push(device);
     await this.save();

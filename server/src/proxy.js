@@ -355,9 +355,10 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     if (!devices.pairingCodeValid(payload.code)) {
       return sendJson(res, 403, { ok: false, error: 'invalid-code' });
     }
-    const issued = await devices.issueDevice(payload.deviceName || 'Android');
+    // 同一台手机重复配对时复用设备条目（按 deviceId 指纹，老版 App 按设备名兜底）
+    const issued = await devices.issueDevice(payload.deviceName || 'Android', payload.deviceId || null);
     if (issued === null) {
-      return sendJson(res, 409, { ok: false, error: 'device-limit', message: `设备数量已达上限（最多 ${devices.maxDevices} 台）` });
+      return sendJson(res, 409, { ok: false, error: 'device-limit', message: `设备数量已达上限（最多 ${devices.maxDevices} 台），可先在电脑运行 tools\\devices.ps1 -Revoke <id>` });
     }
     log(`[auth] 新设备配对（API）: ${issued.device.id} (${issued.device.name})`);
     finishPairing();

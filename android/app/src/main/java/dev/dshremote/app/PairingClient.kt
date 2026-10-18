@@ -12,7 +12,12 @@ class PairingClient {
      * 调用 daemon 的 POST /__dshremote/pair 换取设备令牌。
      * 会阻塞当前线程，调用方需放到 IO 线程。
      */
-    fun pair(serverUrl: String, code: String, deviceName: String = "Android"): PairResult {
+    fun pair(
+        serverUrl: String,
+        code: String,
+        deviceName: String = "Android",
+        deviceId: String? = null,
+    ): PairResult {
         val base = normalizeBaseUrl(serverUrl)
         val connection = (URL("$base/__dshremote/pair").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -26,6 +31,10 @@ class PairingClient {
             val payload = JSONObject()
                 .put("code", code.trim())
                 .put("deviceName", deviceName)
+                .apply {
+                    // 稳定设备 ID：同一台手机重复配对时复用原设备记录，不占用额外名额
+                    if (!deviceId.isNullOrBlank()) put("deviceId", deviceId)
+                }
                 .toString()
             connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
 

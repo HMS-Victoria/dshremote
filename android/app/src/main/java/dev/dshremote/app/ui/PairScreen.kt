@@ -177,7 +177,7 @@ fun PairScreen(
             Spacer(Modifier.height(22.dp))
             Text(
                 text = "在 PC 上启动 dshremote daemon，控制台会打印 6 位配对码。\n" +
-                    "手机与 PC 需要在同一局域网（后续支持内网穿透）。",
+                    "手机与 PC 需在同一 Tailscale/内网虚拟网络（或同一局域网）。",
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
                 textAlign = TextAlign.Center,

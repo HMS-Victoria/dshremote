@@ -6,7 +6,7 @@
 - **dsh-remote-host 插件**：装进 DSH 桌面版，让手机能接管桌面正在用的那个 Host；
 - **dshremote daemon**：一个小服务（Node.js），手机通过它连接电脑，默认端口 `7801`。
 
-手机端需要安装 `dist\dshremote-0.4.2-debug.apk`（本压缩包里已附带，版本信息见 `VERSION.txt`）。
+手机端需要安装 `dist\dshremote-0.4.3-debug.apk`（本压缩包里已附带，版本信息见 `VERSION.txt`）。
 如果解压后没有 `dist` 目录，说明这个包没有附带 APK，请向开发者索取。
 
 ---
@@ -16,7 +16,7 @@
 1. Windows 10/11；
 2. **DSH 桌面版已安装**，并且能正常打开、能正常对话（DSH 会自动创建 `%USERPROFILE%\.dsh` 配置）；
 3. **Node.js 22 或更高版本**（命令行执行 `node -v` 确认；没有的话到 https://nodejs.org 安装 LTS 版）；
-4. 手机和电脑连在**同一个 Wi-Fi**（同一局域网）；
+4. 手机和电脑在**同一个 Tailscale/虚拟私有网络**（推荐，无公网端口）或同一局域网；
 5. 解压到一个**简单路径**（建议 `D:\dshremote-pc`，路径里不要有空格/特殊字符）。
 
 > 首次启动 daemon 时 Windows 防火墙可能弹窗，请选择「允许访问」（专用网络）。
@@ -46,7 +46,7 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\tools\show-qr.ps1
 ```
 
-手机端：安装 `dist\dshremote-0.4.2-debug.apk` → 打开 App → **扫码配对**（或手动输入配对码）。
+手机端：安装 `dist\dshremote-0.4.3-debug.apk` → 打开 App → **扫码配对**（或手动输入配对码）。
 
 > 如果第 1 步报「找不到 DSH 安装目录」，请找到 `DeepSeek Harness.exe` 所在目录，用：
 > `.\tools\install-remote-host-plugin.ps1 -DshDir "C:\Program Files\DeepSeek Harness"`
@@ -103,5 +103,5 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 ## 六、说明
 
 - 这是开发中的测试版，功能可能不完整、可能崩溃，请勿用于重要数据；
-- 只建议在同一局域网内测试，**不要**把 7801 端口直接暴露到公网；
+- 只建议在局域网或 Tailscale 等私有网络内测试，**不要**把 7801 端口直接暴露到公网；
 - 配对码是一次性的，配对成功后会自动换新码，不要截图外传。

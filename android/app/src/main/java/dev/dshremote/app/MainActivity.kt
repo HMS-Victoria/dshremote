@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.os.Bundle
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
@@ -88,7 +89,12 @@ class MainActivity : ComponentActivity() {
                                     try {
                                         val server = PairingClient.normalizeBaseUrl(rawServer)
                                         val result = withContext(Dispatchers.IO) {
-                                            PairingClient().pair(server, code)
+                                            val deviceName = Build.MODEL ?: "Android"
+                                            val deviceId = Settings.Secure.getString(
+                                                contentResolver,
+                                                Settings.Secure.ANDROID_ID,
+                                            )
+                                            PairingClient().pair(server, code, deviceName, deviceId)
                                         }
                                         store.save(server, result.token)
                                         store.saveLastInputs(server, code)

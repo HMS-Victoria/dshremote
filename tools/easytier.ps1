@@ -157,7 +157,7 @@ switch ($Action) {
         Write-Host '=============================================='
         Write-Host ''
         Write-Host '手机端：安装 EasyTier App，添加同样的网络名/密码（可加同样的公共节点），连接后设备会得到 10.126.126.x 地址。'
-        Write-Host '手机 DSH App 的服务器地址填: http://' + $config.virtualIp + ':7801
+        Write-Host ('手机 DSH App 的服务器地址填: http://' + $config.virtualIp + ':7801')
         Write-Host ''
 
         if ($ConfigureDaemon) {

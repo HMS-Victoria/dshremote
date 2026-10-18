@@ -105,9 +105,9 @@ html.dsh-mobile [class*="BynINW_sidebarCol"] {
   z-index: 100 !important;
   transform: translateX(-105%);
   transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
-  /* 不画投影：backdrop 已经区分抽屉与内容，投影在亮色内容上会形成一条黑边 */
+  /* 不画投影/描边：backdrop 已经区分抽屉与内容（投影和描边都会形成一条黑/灰边） */
   box-shadow: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border: 0;
   background: var(--dshremote-panel-bg) !important;
   overflow: hidden !important;
   padding-top: var(--dsh-safe-top) !important;
@@ -180,7 +180,8 @@ html.dsh-mobile-drawer-open .dshremote-fab {
   /* 只遮住抽屉右侧区域，避免个别 WebView 的层叠差异让遮罩盖住抽屉内的按钮 */
   left: var(--dshremote-drawer-w);
   z-index: 75;
-  background: rgba(0, 0, 0, 0.5);
+  /* 用抽屉同色的半透明遮罩，而不是纯黑：纯黑会把主区域压成一条黑边 */
+  background: rgba(21, 21, 23, 0.62);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;

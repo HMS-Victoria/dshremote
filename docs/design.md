@@ -10,10 +10,11 @@
 
 - **应用图标**：改用官方 DSH 「鲸鱼」标（从 DSH 前端 `FISH_LOGO_PATH` 提取路径，
   转为 Android VectorDrawable 自适应图标：深色 `#0E1116` 背景 + 白色鲸鱼）；
-- **横屏适配**（CSS：`(orientation: landscape) and (max-height: 520px)`）：
-  - 悬浮按钮缩小到 36px、抽屉宽度改为 `min(52vw, 320px)`；
-  - 抽屉内「新会话」按钮/插件行/会话行压低高度，横屏也能看到更多会话；
-  - 输入区底部状态条高度压缩；横屏实测 802×374 布局正常（含会话页/抽屉）；
+- **横屏适配**：新增横屏紧凑布局（显示更小悬浮按钮、抽屉变窄、行高压缩，
+  横屏也能看到更多会话）；**不使用 CSS orientation 媒体查询**——华为 ArkWeb 旋转
+  后不会重新求值 orientation，曾导致横屏紧凑样式残留到竖屏（抽屉宽度 52vw、文字
+  被裁）。改为 mobile.js 在 resize/orientationchange 时给 `html` 加
+  `.dsh-mobile-landscape` 类（每 2s 兜底校正），并让抽屉内容宽度自适应，避免裁切；
 - **软键盘**：实测（模拟器 + CDP）键盘弹出时 WebView 正确 zoom 收缩
   （innerHeight 552 → 277 CSS px），`--dshremote-vh` 同步更新，输入框完整可见；
 - **断线提示**：注入脚本统计页面内 WebSocket 开启数（`window.__dshremoteWsState`），

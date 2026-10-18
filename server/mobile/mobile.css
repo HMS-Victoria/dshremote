@@ -554,52 +554,62 @@ html.dsh-mobile .dshremote-conn-retry {
   font-size: 12px;
 }
 
-/* 横屏（高度很小的手机）适配：收紧抽屉与输入区的垂直空间 */
-@media (orientation: landscape) and (max-height: 520px) {
-  html.dsh-mobile {
-    --dshremote-fab-size: 36px;
-    --dshremote-drawer-w: min(52vw, 320px);
-  }
-
-  html.dsh-mobile [class*="BynINW_sidebarCol"] {
-    padding-top: 4px !important;
-  }
-
-  html.dsh-mobile [class*="_2H3hWW_root"] {
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
-  }
-
-  html.dsh-mobile [class*="_2H3hWW_newSession"] {
-    height: 34px !important;
-    min-height: 34px !important;
-    margin-bottom: 6px !important;
-  }
-
-  html.dsh-mobile [class*="_2H3hWW_panelRow"] {
-    min-height: 30px !important;
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
-  }
-
-  html.dsh-mobile [class*="sessionRow"] {
-    min-height: 34px !important;
-  }
-
-  html.dsh-mobile [class*="Dc7zOa_header"] {
-    padding-left: calc(50px + var(--dsh-safe-left)) !important;
-  }
-
-  html.dsh-mobile [class*="Dc7zOa_composerSeat"] {
-    padding-bottom: calc(2px + var(--dsh-safe-bottom)) !important;
-  }
-
-  html.dsh-mobile [class*="RlGAzG_dock"] {
-    height: 24px !important;
-    font-size: 10px !important;
-  }
+/* 横屏（矮屏幕）适配：由 mobile.js 在 resize 时加 .dsh-mobile-landscape 类，
+   不依赖 CSS orientation 媒体查询（部分 WebView 旋转后不会重新求值）。 */
+html.dsh-mobile.dsh-mobile-landscape {
+  --dshremote-fab-size: 36px;
+  --dshremote-drawer-w: min(52vw, 320px);
 }
 
+html.dsh-mobile.dsh-mobile-landscape [class*="BynINW_sidebarCol"] {
+  padding-top: 4px !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="_2H3hWW_root"] {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="_2H3hWW_newSession"] {
+  height: 34px !important;
+  min-height: 34px !important;
+  margin-bottom: 6px !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="_2H3hWW_panelRow"] {
+  min-height: 30px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="sessionRow"] {
+  min-height: 34px !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="Dc7zOa_header"] {
+  padding-left: calc(50px + var(--dsh-safe-left)) !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="Dc7zOa_composerSeat"] {
+  padding-bottom: calc(2px + var(--dsh-safe-bottom)) !important;
+}
+
+html.dsh-mobile.dsh-mobile-landscape [class*="RlGAzG_dock"] {
+  height: 24px !important;
+  font-size: 10px !important;
+}
+
+/* 抽屉内固定宽度的内容跟随抽屉宽度收缩，避免窄抽屉下文字被裁切 */
+html.dsh-mobile [class*="BynINW_sidebarCol"] > * {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+html.dsh-mobile [class*="_9lTDKa_root"],
+html.dsh-mobile [class*="_9lTDKa_flatList"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 /* iOS / 移动端输入框防缩放 */
 @media (max-width: 820px) {
   html.dsh-mobile textarea,

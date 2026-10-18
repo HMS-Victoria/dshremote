@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.2';
+const VERSION = '0.3.3';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -187,6 +187,19 @@ function installViewportClass() {
   const sync = () => root.classList.toggle('dsh-mobile-narrow', query.matches);
   sync();
   query.addEventListener?.('change', sync);
+
+  // 用 JS 判定“矮横屏”，而不是依赖 CSS 的 orientation 媒体查询：
+  // 部分 WebView（华为 ArkWeb）旋转后不会重新求值 orientation，导致横屏样式
+  // 被带进竖屏（抽屉变窄、文字被裁）。这里在 resize/orientationchange 时重新计算。
+  const syncLandscape = () => {
+    const short = window.innerHeight < 520 && window.innerWidth > window.innerHeight;
+    root.classList.toggle('dsh-mobile-landscape', short);
+  };
+  syncLandscape();
+  window.addEventListener('resize', syncLandscape);
+  window.addEventListener('orientationchange', () => setTimeout(syncLandscape, 300));
+  window.visualViewport?.addEventListener('resize', syncLandscape);
+  setInterval(syncLandscape, 2000);
 }
 
 /** 点击会话项 / 新建会话 / 插件 / 自动化任务后自动收起抽屉（这些会在主区域打开面板）。 */

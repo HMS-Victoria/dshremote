@@ -873,3 +873,33 @@ html.dsh-mobile [class*="sessionRow"] [class*="time"] {
   color: #8b949e;
   font-size: 12px;
 }
+/* 其余 DSH 弹层 / 对话框的高度上限也用了 vh / dvh：
+   华为 ArkWeb 里 vh 会算成 0，弹层会塌成 0 或直接溢出屏幕。
+   这里按“真实视口高度”统一兜底（保留各自原来的像素上限）。 */
+html.dsh-mobile [class*="_3tUStW_scrollable"],
+html.dsh-mobile [class*="_VovcG_panel"],
+html.dsh-mobile [class*="q7hbua_menu"],
+html.dsh-mobile [class*="EBLgjq_panel"],
+html.dsh-mobile [class*="foD-wG_menu"] {
+  max-height: calc(var(--dshremote-vh, 100vh) - 24px) !important;
+}
+
+html.dsh-mobile [class*="_3Y3Nma_dialog"] {
+  max-height: min(600px, calc(var(--dshremote-vh, 100vh) - 24px)) !important;
+}
+
+html.dsh-mobile [class*="S0jZwq_zoneMenu"],
+html.dsh-mobile [class*="S0jZwq_confirmDialog"] {
+  max-height: min(420px, calc(var(--dshremote-vh, 100vh) - 48px)) !important;
+}
+
+/* 通用兜底：任何仍用 vh/dvh 计算高度的弹层（菜单/对话框/面板/滚动容器），
+   统一改成真实视口高度，避免在新的 DSH 版本/插件里再次出现“选项跑到屏幕外”。 */
+html.dsh-mobile [class*="_menu"],
+html.dsh-mobile [class*="_popover"],
+html.dsh-mobile [class*="_dialog"],
+html.dsh-mobile [class*="_panel"],
+html.dsh-mobile [class*="_scrollable"],
+html.dsh-mobile [class*="_zoneMenu"] {
+  max-height: calc(var(--dshremote-vh, 100vh) - 24px) !important;
+}

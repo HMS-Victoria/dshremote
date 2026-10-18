@@ -31,7 +31,10 @@ function parseArgs(argv) {
       case '--screenshot': result.screenshot = argv[++i]; break;
       case '--dom': result.dom = argv[++i]; break;
       case '--click': result.click = argv[++i]; break;
+      case '--click-selector': result.clickSelector = argv[++i]; break;
       case '--eval': result.eval = argv[++i]; break;
+      case '--eval-file': result.evalFile = argv[++i]; break;
+      case '--steps': result.steps = argv[++i]; break;
       case '--edge': result.edge = argv[++i]; break;
       case '--port': result.port = Number(argv[++i]); break;
       case '--no-mobile': result.mobile = false; break;
@@ -189,13 +192,104 @@ async function main() {
       await sleep(2500);
     }
 
-    if (args.eval) {
+    if (args.steps) {
+      const { readFile } = await import('node:fs/promises');
+      const steps = JSON.parse(await readFile(args.steps, 'utf8'));
+      for (const [index, step] of steps.entries()) {
+        const label = `[step ${index + 1}]`;
+        try {
+          if (step.clickSelector || step.clickText) {
+            const expression = step.clickSelector
+              ? `(() => { const el = document.querySelector(${JSON.stringify(step.clickSelector)}); if (!el) return { clicked: false }; el.click(); return { clicked: true, cls: String(el.className).slice(0, 60) }; })()`
+              : `(() => { const t = ${JSON.stringify(step.clickText)}; const els = [...document.querySelectorAll('button, [role="button"], a, [tabindex]')]; const el = els.find((e) => (e.textContent || '').trim().includes(t)); if (!el) return { clicked: false, available: els.map((e) => (e.textContent || '').trim().slice(0, 20)).filter(Boolean).slice(0, 15) }; el.click(); return { clicked: true, text: (el.textContent || '').trim().slice(0, 40) }; })()`;
+            const clicked = await cdp.send('Runtime.evaluate', { expression, returnByValue: true });
+            console.log(label, 'click:', JSON.stringify(clicked.result.value));
+          }
+          if (step.mouse) {
+            const [x, y] = step.mouse;
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+            console.log(label, `mouse click: ${x},${y}`);
+          }
+          if (step.typeText) {
+            const focused = await cdp.send('Runtime.evaluate', {
+              expression: `(() => {
+                const el = document.querySelector('[contenteditable="true"], textarea, input[type="text"]');
+                if (!el) return { focused: false };
+                el.focus();
+                return { focused: true, tag: el.tagName };
+              })()`,
+              returnByValue: true,
+            });
+            console.log(label, 'focus:', JSON.stringify(focused.result.value));
+            await cdp.send('Input.insertText', { text: step.typeText });
+            console.log(label, 'typeText:', step.typeText.slice(0, 60));
+          }
+          if (step.keys) {
+            const combo = String(step.keys).split('+').map((part) => part.trim()).filter(Boolean);
+            const key = combo[combo.length - 1];
+            const modifierMap = { Alt: 1, Control: 2, Meta: 4, Shift: 8 };
+            let modifiers = 0;
+            for (const part of combo.slice(0, -1)) modifiers |= modifierMap[part] ?? 0;
+            const upper = key.length === 1 ? key.toUpperCase() : key;
+            const code = key.length === 1 ? `Key${upper}` : key;
+            const keyCode = key.length === 1 ? upper.charCodeAt(0) : 0;
+            await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
+            await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
+            console.log(label, `keys: ${step.keys}`);
+          }
+          if (step.evalFile || step.eval) {
+            const { readFile: rf } = await import('node:fs/promises');
+            const source = step.evalFile ? await rf(step.evalFile, 'utf8') : step.eval;
+            const result = await cdp.send('Runtime.evaluate', { expression: source, returnByValue: true, awaitPromise: true });
+            console.log(label, 'eval:', JSON.stringify(result.result.value, null, 2));
+          }
+          await sleep(step.wait ?? 500);
+          if (step.screenshot) {
+            const shot = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+            await mkdir(path.dirname(path.resolve(step.screenshot)), { recursive: true });
+            await writeFile(step.screenshot, Buffer.from(shot.data, 'base64'));
+            console.log(label, '截图:', path.resolve(step.screenshot));
+          }
+          if (step.dom) {
+            const dom = await cdp.send('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true });
+            await mkdir(path.dirname(path.resolve(step.dom)), { recursive: true });
+            await writeFile(step.dom, dom.result.value, 'utf8');
+            console.log(label, 'DOM:', path.resolve(step.dom));
+          }
+        } catch (error) {
+          console.error(label, '失败:', error.message);
+        }
+      }
+    }
+
+    if (args.clickSelector) {
+      const clickResult = await cdp.send('Runtime.evaluate', {
+        expression: `(() => {
+          const target = document.querySelector(${JSON.stringify(args.clickSelector)});
+          if (!target) return { clicked: false };
+          target.click();
+          return { clicked: true, tag: target.tagName, cls: String(target.className).slice(0, 80) };
+        })()`,
+        returnByValue: true,
+      });
+      console.log('点击(selector)结果:', JSON.stringify(clickResult.result.value));
+      await sleep(2500);
+    }
+
+    if (args.eval || args.evalFile) {
+      const { readFile } = await import('node:fs/promises');
+      const source = args.evalFile ? await readFile(args.evalFile, 'utf8') : args.eval;
       const evalResult = await cdp.send('Runtime.evaluate', {
-        expression: args.eval,
+        expression: source,
         returnByValue: true,
         awaitPromise: true,
       });
       console.log('eval:', JSON.stringify(evalResult.result.value, null, 2));
+      if (evalResult.exceptionDetails) {
+        console.error('eval 异常:', JSON.stringify(evalResult.exceptionDetails, null, 2));
+      }
     }
 
     const summary = await cdp.send('Runtime.evaluate', {

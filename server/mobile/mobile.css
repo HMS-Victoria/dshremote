@@ -36,7 +36,16 @@ html.dsh-mobile * {
 html.dsh-mobile ::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
+  display: none !important;
   background: transparent !important;
+}
+
+/* 避免滚动容器出现横向滚动（WebView 会把横向滚动条画成灰色小胶囊） */
+html.dsh-mobile [class*="RlGAzG_scroll"],
+html.dsh-mobile [class*="Dc7zOa_scrollBody"],
+html.dsh-mobile [class*="_9lTDKa_root"],
+html.dsh-mobile [class*="_9lTDKa_flatList"] {
+  overflow-x: hidden !important;
 }
 
 html.dsh-mobile body {
@@ -445,6 +454,16 @@ html.dsh-mobile [class*="_scrollable_4ub78_19"] {
   max-height: calc(var(--dshremote-vh, 100vh) - 24px) !important;
 }
 
+/* 模型选择菜单自己有独立的 max-height: min(360px, 100vh - 96px)，同样会被压成 0 */
+html.dsh-mobile [class*="wq12jW_menu"] {
+  max-height: min(360px, calc(var(--dshremote-vh, 100vh) - 96px)) !important;
+}
+
+/* 文件选择等对话框：height / max-height 里也用了 100dvh */
+html.dsh-mobile [class*="Fv-y6W_dialog"] {
+  height: min(500px, calc(var(--dshremote-vh, 100dvh) - 32px)) !important;
+}
+
 html.dsh-mobile [class*="_confirmation_cjd8z_1"] {
   max-height: calc(var(--dshremote-vh, 100dvh) - 48px) !important;
 }
@@ -453,6 +472,9 @@ html.dsh-mobile [class*="_confirmation_cjd8z_1"] {
    （原布局是“图标+文字”整体居中，导致文字视觉上偏右） */
 html.dsh-mobile [class*="_newSessionContent"] {
   position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  align-items: center !important;
   justify-content: center !important;
 }
 
@@ -462,6 +484,15 @@ html.dsh-mobile [class*="_newSessionContent"] > svg {
   top: 50% !important;
   margin: 0 !important;
   transform: translateY(-50%) !important;
+}
+
+html.dsh-mobile [class*="_newSessionLabel"] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  line-height: 1 !important;
+  text-align: center !important;
 }
 
 html.dsh-mobile [class*="_newSessionShortcut"] {

@@ -20,6 +20,9 @@
 > [android/README.md](android/README.md)。
 >
 > **APK**：`dist/dshremote-0.4.2-debug.apk`（debug 签名，直接安装）
+>
+> **交付测试包**：`.\tools\package-pc.ps1` → `dist\dshremote-pc-0.4.2.zip`
+> （插件 + daemon + 工具脚本 + APK + 测试说明，解压即用）
 
 ## 原理
 

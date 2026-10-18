@@ -149,3 +149,49 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 3. 给别人测试/临时配对时，配对完立刻确认设备列表：`.\tools\devices.ps1`；
 4. 手机丢了立刻吊销：`.\tools\devices.ps1 -Revoke <id>`；
 5. 长期建议：DSH/daemon 不要用 Administrator 账户运行（当前是 Administrator，权限较高）。
+
+---
+
+## 方案 E：EasyTier 组网（推荐：不暴露公网入口）
+
+EasyTier 是开源 P2P 组网工具：电脑和手机加入同一个「网络名 + 网络密码」的虚拟局域网，
+双方用 `10.126.126.x` 虚拟 IP 互通，**daemon 不需要暴露到公网**。
+
+### 已完成的电脑端配置
+
+- EasyTier 程序：`tools\bin\easytier\easytier-windows-x86_64\`
+- 网络配置：`.data\easytier.json`（网络名/密码/虚拟 IP/公共节点）
+- 电脑虚拟 IP：`10.126.126.1`
+- daemon 的 `publicUrl` 已设为 `http://10.126.126.1:7801`，二维码直接用虚拟网地址；
+- 防火墙只放行了 EasyTier 网段（`10.126.126.0/24`）访问 7801。
+
+常用命令：
+
+```powershell
+.\tools\easytier.ps1 -Action status   # 查看本机虚拟 IP 和已连接节点
+.\tools\easytier.ps1 -Action up       # 启动（管理员 PowerShell）
+.\tools\easytier.ps1 -Action down     # 停止
+```
+
+### 手机端步骤
+
+1. 安装 EasyTier Android 版 APK（本项目 `dist\easytier-android-arm64-v2.6.4.apk`，
+   或从 <https://github.com/EasyTier/EasyTier/releases> 下载对应架构）；
+2. 打开 EasyTier → 添加网络：
+   - 网络名称/网络密码：填 `.data\easytier.json` 里的 `networkName` / `networkSecret`；
+   - 公共节点（peers）：`udp://public.easytier.cn:11010`（连不上可换
+     `tcp://public.easytier.cn:11010`）；
+   - 虚拟 IP：保持 DHCP/自动即可（会分到 `10.126.126.x`）；
+3. 连接后确认手机拿到了 `10.126.126.x` 地址；
+4. DSH Remote App → 切换服务器 → 地址填 `http://10.126.126.1:7801`；
+5. 电脑上 `.\tools\show-qr.ps1` 打开二维码页面，手机扫码配对
+   （虚拟网属于私有地址，**不需要**公网配对窗口）。
+
+> ⚠️ EasyTier 在 Android 上也是 VPN 应用：和梯子互斥，用 DSH 时先关梯子。
+
+### 安全说明
+
+- 没有任何公网入口（别人扫不到你的 daemon）；
+- 只有知道「网络名 + 网络密码」的设备能加入虚拟网，密码请当作机密保管；
+- 可以后续把「Node.js JavaScript Runtime」的宽泛防火墙规则禁用，只保留 EasyTier 网段；
+- 公共节点只负责发现/中继，打洞成功时是 P2P 直连且流量加密。

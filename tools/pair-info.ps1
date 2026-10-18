@@ -40,7 +40,12 @@ if ($livePairing -and $livePairing.expiresAt) {
     }
 }
 if ($livePairing -and $livePairing.publicUrl) {
-    if ($livePairing.publicPairAllowed) {
+    $publicHost = ''
+    try { $publicHost = ([System.Uri]$livePairing.publicUrl).Host } catch { $publicHost = '' }
+    $privatePattern = '^(10\.|127\.|192\.168\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|172\.(1[6-9]|2\d|3[01])\.)'
+    if ($publicHost -match $privatePattern -or $publicHost -eq 'localhost') {
+        Write-Host (' 配对地址: ' + $livePairing.publicUrl + '（虚拟网/局域网，无需公网配对窗口）') -ForegroundColor Cyan
+    } elseif ($livePairing.publicPairAllowed) {
         $until = ([datetime]$livePairing.publicPairWindowUntil).ToLocalTime().ToString('HH:mm:ss')
         Write-Host (' 公网配对: 已开启（到 ' + $until + '）') -ForegroundColor Green
     } else {

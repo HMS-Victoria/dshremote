@@ -7,6 +7,31 @@ export function isTailscaleAddress(address) {
   return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
 }
 
+/**
+ * 判断一个主机名是否属于“私有/虚拟网/本机”地址：
+ * 用于区分「公网域名（需要公网配对窗口）」和「Tailscale / EasyTier / 局域网地址（无需窗口）」。
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+export function isPrivateHostname(hostname) {
+  const host = String(hostname ?? '').trim().toLowerCase();
+  if (host === '') return true;
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.lan') || host.endsWith('.internal')) return true;
+  if (host.includes(':')) {
+    // IPv6：回环、链路本地、ULA
+    return host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd');
+  }
+  const parts = host.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  if (a === 10 || a === 127) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // Tailscale / CGNAT
+  return false;
+}
+
 /** 局域网候选地址：排除回环、链路本地和明显虚拟网卡。 */
 export function lanAddresses() {
   const result = [];

@@ -9,7 +9,7 @@ import net from 'node:net';
 import { createHash } from 'node:crypto';
 import { deviceCookie } from './auth.js';
 import { injectHtml, pairPageHtml, serveMobileAsset } from './inject.js';
-import { lanUrls } from './net.js';
+import { isPrivateHostname, lanUrls } from './net.js';
 import { listDirectory } from './browse.js';
 
 const PAIR_API_PATH = '/__dshremote/pair';
@@ -38,15 +38,20 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
  */
 export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase, publicUrl = null }) {
   const events = [];
-  /** 公网配对地址的 host（来自 publicUrl），用于识别“公网配对请求”。 */
-  const publicHost = (() => {
+  /**
+   * 公网配对地址信息（来自 publicUrl）。
+   * 只有“公网域名”才需要公网配对窗口；EasyTier/Tailscale/局域网等私有地址不算公网。
+   */
+  const publicHostInfo = (() => {
     if (typeof publicUrl !== 'string' || publicUrl === '') return null;
     try {
-      return new URL(publicUrl).hostname.toLowerCase();
+      const hostname = new URL(publicUrl).hostname.toLowerCase();
+      return { hostname, isPrivate: isPrivateHostname(hostname) };
     } catch {
       return null;
     }
   })();
+  const publicHost = publicHostInfo === null || publicHostInfo.isPrivate ? null : publicHostInfo.hostname;
   /** 配对尝试限速（全局 + 按 IP，滑动 60 秒窗口）。 */
   const pairRate = { global: [], perIp: new Map() };
 

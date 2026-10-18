@@ -17,7 +17,7 @@ import { DeviceStore } from './auth.js';
 import { DshHost, ExportedHost, dshHomeDir, exportedHostPath } from './dsh-host.js';
 import { HostEventBus } from './host-events.js';
 import { createProxy } from './proxy.js';
-import { lanUrls, tailscaleUrls } from './net.js';
+import { isPrivateHostname, lanUrls, tailscaleUrls } from './net.js';
 
 const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);
 
@@ -227,7 +227,17 @@ async function main() {
   log(` 配对码有效期: ${config.pairing.codeTtlMs === null ? '不过期' : `${Math.round(config.pairing.codeTtlMs / 60000)} 分钟`}`);
   log(` 设备上限: ${devices.maxDevices} 台，令牌有效期 ${Math.round((config.pairing.deviceTtlMs ?? 0) / 86400000)} 天`);
   if (config.publicUrl) {
-    log(' 公网配对: 关闭（配对新设备前运行 .\\tools\\pair-open.ps1 临时开启 5 分钟）');
+    let publicUrlIsPrivate = false;
+    try {
+      publicUrlIsPrivate = isPrivateHostname(new URL(config.publicUrl).hostname);
+    } catch {
+      // 地址不合法时按公网处理
+    }
+    if (publicUrlIsPrivate) {
+      log(' 配对地址: 虚拟网/局域网地址（直接扫码配对，无需公网配对窗口）');
+    } else {
+      log(' 公网配对: 关闭（配对新设备前运行 .\\tools\\pair-open.ps1 临时开启 5 分钟）');
+    }
   }
   log('==============================================');
 

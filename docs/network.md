@@ -86,3 +86,40 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 - 设备访问需要配对令牌（一次性配对码 + 长期设备令牌），
   丢手机可以用 `.\tools\devices.ps1 -Revoke <id>` 立刻吊销；
 - 公网暴露时建议只允许隧道来源、并定期检查 `.data/audit.log`。
+---
+
+## 方案 C：Tailscale Funnel（电脑装 Tailscale，手机零安装）
+
+如果手机装不了 Tailscale，但电脑上能装，可以用 Funnel 把本机端口直接发布成公网 HTTPS：
+
+1. 电脑登录 Tailscale（托盘图标 → Log in）；
+2. 打开 Tailscale 后台 <https://login.tailscale.com/admin>：
+   - 在 **DNS** 里启用 HTTPS 证书（HTTPS Certificates）；
+   - 在 **Access Controls** 里给节点开放 funnel 权限（nodeAttrs 加 `funnel`；或按后台提示一键启用）；
+3. 在电脑上执行（默认路径可能是 `C:\Program Files\Tailscale\tailscale.exe`）：
+   ```powershell
+   tailscale funnel 7801
+   ```
+   成功后会得到形如 `https://你的电脑名.你的tailnet.ts.net/` 的地址（只对 7801 端口的本地服务生效）；
+4. 把这个地址填进 dshremote：
+   ```powershell
+   .\tools\set-public-url.ps1 -Url "https://你的电脑名.你的tailnet.ts.net" -Restart
+   ```
+5. 手机 App 重新扫码或刷新页面即可，**手机不需要装任何 VPN/App**。
+
+注意：Funnel 要求电脑上的 Tailscale 保持在线；如果 Clash TUN 导致 Tailscale 连不上，
+参考上面的 Clash 配置（把 Tailscale/`*.tailscale.com` 设为直连）。
+
+## 方案 D：免费内网穿透（SakuraFrp / 花生壳等）
+
+手机同样零安装，国内可用性通常不错，但需要注册并安装对应客户端：
+
+1. 注册 SakuraFrp 等免费穿透服务，创建一个指向 `127.0.0.1:7801` 的 TCP/HTTP 隧道；
+2. 拿到公网地址（如 `https://xxxx.natfrp.cloud`）；
+3. 执行：
+   ```powershell
+   .\tools\set-public-url.ps1 -Url "https://xxxx.natfrp.cloud" -Restart
+   ```
+4. 手机扫码即可。
+
+> 若穿透服务只给「IP:端口」，也可以直接填：`.\tools\set-public-url.ps1 -Url "http://1.2.3.4:12345"`。

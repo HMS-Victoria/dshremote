@@ -16,3 +16,6 @@ android/**/build/
 .vscode/
 .idea/
 *.tmp
+
+# 外部二进制（cloudflared 等，按需下载）
+tools/bin/

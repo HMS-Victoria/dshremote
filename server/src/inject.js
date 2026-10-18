@@ -191,12 +191,27 @@ const BOOT_INLINE = `
 
   var NativeWebSocket = window.WebSocket;
   if (typeof NativeWebSocket === 'function') {
+    // 供移动壳显示“连接断开”横幅：统计当前打开的 WebSocket 数量并广播变化。
+    var wsState = { open: 0, total: 0 };
+    window.__dshremoteWsState = wsState;
+    function notifyWsChange() {
+      try {
+        window.dispatchEvent(new CustomEvent('dshremote-ws-change', { detail: { open: wsState.open } }));
+      } catch (error) { /* ignore */ }
+    }
     function DshremoteWebSocket(url, protocols) {
       var socket = protocols === undefined ? new NativeWebSocket(url) : new NativeWebSocket(url, protocols);
       var info = { url: String(url), openedAt: 0, frames: 0 };
-      socket.addEventListener('open', function () { info.openedAt = Date.now(); });
+      socket.addEventListener('open', function () {
+        info.openedAt = Date.now();
+        wsState.open += 1;
+        wsState.total += 1;
+        notifyWsChange();
+      });
       socket.addEventListener('message', function () { info.frames += 1; });
       socket.addEventListener('close', function (event) {
+        wsState.open = Math.max(0, wsState.open - 1);
+        notifyWsChange();
         report({
           event: 'ws-close',
           url: info.url,

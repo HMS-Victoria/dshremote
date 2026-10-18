@@ -510,6 +510,96 @@ html.dsh-mobile pre {
   overflow-x: auto;
 }
 
+/* 断线 / 无网络提示横幅 */
+.dshremote-conn-banner {
+  position: fixed;
+  left: 50%;
+  top: calc(8px + var(--dsh-safe-top));
+  transform: translateX(-50%);
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(179, 38, 30, 0.95);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.dshremote-conn-banner[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html.dsh-mobile .dshremote-conn-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html.dsh-mobile .dshremote-conn-retry {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+/* 横屏（高度很小的手机）适配：收紧抽屉与输入区的垂直空间 */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.dsh-mobile {
+    --dshremote-fab-size: 36px;
+    --dshremote-drawer-w: min(52vw, 320px);
+  }
+
+  html.dsh-mobile [class*="BynINW_sidebarCol"] {
+    padding-top: 4px !important;
+  }
+
+  html.dsh-mobile [class*="_2H3hWW_root"] {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  html.dsh-mobile [class*="_2H3hWW_newSession"] {
+    height: 34px !important;
+    min-height: 34px !important;
+    margin-bottom: 6px !important;
+  }
+
+  html.dsh-mobile [class*="_2H3hWW_panelRow"] {
+    min-height: 30px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  html.dsh-mobile [class*="sessionRow"] {
+    min-height: 34px !important;
+  }
+
+  html.dsh-mobile [class*="Dc7zOa_header"] {
+    padding-left: calc(50px + var(--dsh-safe-left)) !important;
+  }
+
+  html.dsh-mobile [class*="Dc7zOa_composerSeat"] {
+    padding-bottom: calc(2px + var(--dsh-safe-bottom)) !important;
+  }
+
+  html.dsh-mobile [class*="RlGAzG_dock"] {
+    height: 24px !important;
+    font-size: 10px !important;
+  }
+}
+
 /* iOS / 移动端输入框防缩放 */
 @media (max-width: 820px) {
   html.dsh-mobile textarea,

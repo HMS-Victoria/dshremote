@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.3.0';
+const VERSION = '0.3.2';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -207,6 +207,69 @@ function installAutoClose() {
   }, true);
 }
 
+/**
+ * 断线提示：页面内 WebSocket 全部断开（或手机网络断开）时显示顶部横幅，
+ * 恢复后自动隐藏。用于 daemon/电脑端断开、手机切换网络等场景。
+ */
+function installConnectionBanner() {
+  if (document.querySelector('.dshremote-conn-banner') !== null) return;
+  const banner = document.createElement('div');
+  banner.className = 'dshremote-conn-banner';
+  banner.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.className = 'dshremote-conn-text';
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'dshremote-conn-retry';
+  retry.textContent = '重试';
+  retry.addEventListener('click', () => {
+    location.reload();
+  });
+  banner.append(text, retry);
+  document.body.appendChild(banner);
+
+  const loadedAt = Date.now();
+  let connectedOnce = false;
+  const update = () => {
+    const state = window.__dshremoteWsState ?? { open: 0 };
+    const open = Number(state.open) || 0;
+    if (open > 0) {
+      connectedOnce = true;
+      banner.dataset.visible = 'false';
+      return;
+    }
+    const offline = navigator.onLine === false;
+    const waitedLong = Date.now() - loadedAt > 8000;
+    let message = null;
+    if (offline) message = '手机网络已断开';
+    else if (connectedOnce || waitedLong) message = '与电脑的连接已断开，正在重新连接…';
+    if (message === null) {
+      banner.dataset.visible = 'false';
+      return;
+    }
+    text.textContent = message;
+    banner.dataset.visible = 'true';
+  };
+
+  window.addEventListener('dshremote-ws-change', update);
+  window.addEventListener('online', () => { setTimeout(update, 400); });
+  window.addEventListener('offline', update);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') update();
+  });
+  setInterval(update, 3000);
+  update();
+
+  // 调试钩子：window.dshremoteDebugConnection(true/false)
+  window.dshremoteDebugConnection = (visible) => {
+    if (visible && text.textContent === '') {
+      text.textContent = '与电脑的连接已断开，正在重新连接…';
+    }
+    banner.dataset.visible = visible ? 'true' : 'false';
+    if (!visible) connectedOnce = true;
+  };
+}
+
 function init() {
   buildFab();
   installSidebarObserver();
@@ -214,6 +277,7 @@ function init() {
   installBodyObserver();
   installAutoClose();
   installViewportClass();
+  installConnectionBanner();
   scheduleSync();
 
   // 原生外壳（Android）返回键：优先关闭抽屉/右栏，返回 true 表示已消费

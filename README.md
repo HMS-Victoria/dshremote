@@ -12,13 +12,14 @@
 > daemon 以接管模式直接操控桌面 DSH 的宿主（不再有 session/writer-held 冲突）；
 > 安装/卸载见 	ools/install-remote-host-plugin.ps1、	ools/uninstall-remote-host-plugin.ps1。
 > 下一步：通知动作（审批直接处理）→ 横竖屏/软键盘细节 → 隧道支持。
-> 已支持：扫码配对（电脑打开配对页显示二维码，手机 App 扫码即配对）。
+> 已支持：扫码配对（电脑打开配对页显示二维码，手机 App 扫码即配对）；
+> 横屏/软键盘适配、断线提示横幅、DSH 黑鲸鱼应用图标。
 > 已支持：手机通知（审批/回合完成/错误）+ 点击通知打开对应会话；
 > daemon 一次性配对码、设备列表/吊销/清理、审计日志、后台与开机自启脚本。
 > 完整方案见 [docs/design.md](docs/design.md)；Android 构建见
 > [android/README.md](android/README.md)。
 >
-> **APK**：`dist/dshremote-0.3.0-debug.apk`（debug 签名，直接安装）
+> **APK**：`dist/dshremote-0.4.0-debug.apk`（debug 签名，直接安装）
 
 ## 原理
 

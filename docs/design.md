@@ -45,6 +45,9 @@ WebSocket 关闭码上报（`POST /__dshremote/client-log`）。用"删除这些
 的模拟旧内核测试验证：mux 帧收发恢复正常、无重连。另新增 daemon
 `/__dshremote/diag` 诊断端点与 `tools/diag.ps1`。
 
+**真机验证通过（2026-10-18 13:05）**：用户确认"可以连接了"，daemon 诊断中手机侧
+只剩正常 API 请求，WS 不再抖动。M3 完成。
+
 ### M2（2026-10-18）：移动端适配核心可用
 
 已验证（390×844 无头浏览器 + 真实 DSH web 宿主）：

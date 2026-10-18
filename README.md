@@ -4,12 +4,13 @@
 类似 codexremote，但利用 DSH 自身的 Host/Client 架构：手机端拿到的是真实 DSH 界面
 （实时会话、流式输出、工具审批、文件浏览），而不是一份简化的副本。
 
-> 当前进度（2026-10-18）：**M2 移动端适配核心可用 + M3 Android 混合壳 APK 已产出**。
-> 手机端已能通过浏览器/APK 连接 daemon，使用真实 DSH 界面（会话抽屉、聊天、文件浏览、
-> 设置页均适配手机）；Android App 支持原生配对、图片附件、返回键联动。
-> 下一步：M3 真机验证 → 扫码/通知 → M1 daemon 加固 → M4 插件接管桌面 App。
-> 完整方案见 [docs/design.md](docs/design.md)；Android 构建见
-> [android/README.md](android/README.md)。
+> 当前进度（2026-10-18）：**M2/M3 完成，真机已验证可连接**。
+> 手机端可通过 Android APK（或浏览器）连接 PC 上的 daemon，使用真实 DSH 界面
+> （会话抽屉、聊天、文件浏览、设置页均已适配手机）；已修复旧 WebView 的
+> 兼容性问题（polyfill）导致的无限重连。
+> 下一步：M1 daemon 加固（一次性配对/设备管理/审计）→ M3.5 扫码/通知 →
+> M4 插件接管桌面 App。完整方案见 [docs/design.md](docs/design.md)；
+> Android 构建见 [android/README.md](android/README.md)。
 >
 > **APK**：`dist/dshremote-0.1.0-debug.apk`（debug 签名，直接安装）
 

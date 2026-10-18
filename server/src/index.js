@@ -148,28 +148,37 @@ async function main() {
   let preferredPairBase = null;
 
   const writePairingInfo = async (current, reason) => {
-    await writeFile(pairingFile, JSON.stringify({
-      code: current.code,
-      expiresAt: current.expiresAt === null ? null : new Date(current.expiresAt).toISOString(),
-      localUrl: `http://127.0.0.1:${port}/pair?code=${current.code}`,
-      publicUrl: preferredPairBase,
-      publicPairUrl: preferredPairBase === null ? null : `${preferredPairBase}/pair?code=${current.code}`,
-      tailscaleUrls: tailscale.map((entry) => `${entry.url}/pair?code=${current.code}`),
-      urls: urls.map((entry) => `${entry.url}/pair?code=${current.code}`),
-      oneTime: devices.oneTime,
-      reason,
-      updatedAt: new Date().toISOString(),
-    }, null, 2) + '\n');
+    try {
+      await writeFile(pairingFile, JSON.stringify({
+        code: current.code,
+        expiresAt: current.expiresAt === null ? null : new Date(current.expiresAt).toISOString(),
+        localUrl: `http://127.0.0.1:${port}/pair?code=${current.code}`,
+        publicUrl: preferredPairBase,
+        publicPairUrl: preferredPairBase === null ? null : `${preferredPairBase}/pair?code=${current.code}`,
+        tailscaleUrls: tailscale.map((entry) => `${entry.url}/pair?code=${current.code}`),
+        urls: urls.map((entry) => `${entry.url}/pair?code=${current.code}`),
+        oneTime: devices.oneTime,
+        reason,
+        updatedAt: new Date().toISOString(),
+      }, null, 2) + '\n');
+    } catch (error) {
+      // 写不了配对信息文件也不能让 daemon 挂掉（例如目录权限被改动）
+      log(`[startup] 写入 pairing.json 失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
   const writeRuntimeInfo = async (current) => {
-    await writeFile(runtimeFile, JSON.stringify({
-      pid: process.pid,
-      hostMode: current.mode,
-      upstream: current.origin,
-      upstreamProfile: current.profile ?? null,
-      listen: { host: config.listen.host, port },
-      startedAt: new Date().toISOString(),
-    }, null, 2) + '\n');
+    try {
+      await writeFile(runtimeFile, JSON.stringify({
+        pid: process.pid,
+        hostMode: current.mode,
+        upstream: current.origin,
+        upstreamProfile: current.profile ?? null,
+        listen: { host: config.listen.host, port },
+        startedAt: new Date().toISOString(),
+      }, null, 2) + '\n');
+    } catch (error) {
+      log(`[startup] 写入 runtime.json 失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const proxy = createProxy({
@@ -250,6 +259,11 @@ async function main() {
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
+
+// 未处理的 Promise 拒绝只记录，不让 daemon 直接退出（例如磁盘/权限临时异常）
+process.on('unhandledRejection', (reason) => {
+  log(`[warn] 未处理的异步错误: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}`);
+});
 
 main().catch((error) => {
   console.error('[dshremote] 启动失败:\n' + (error.stack ?? error.message));

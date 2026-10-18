@@ -35,7 +35,7 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
  * @param {(pairing: object) => void} [options.onPairingChanged]
  *   配对码轮换（一次性码被使用 / 手动轮换）后的回调，daemon 用它更新配对信息文件。
  */
-export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged }) {
+export function createProxy({ getUpstream, devices, log, eventBus, onPairingChanged, preferPairBase }) {
   const failures = new Map();
   const events = [];
 
@@ -177,6 +177,9 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
    * @param {import('node:http').IncomingMessage} req
    */
   function pairBaseUrl(req) {
+    // 优先用外网/Tailscale 地址（daemon 检测或配置提供），手机在外网扫码也能连
+    const preferred = typeof preferPairBase === 'function' ? preferPairBase(req) : null;
+    if (typeof preferred === 'string' && preferred !== '') return preferred;
     const host = String(req.headers.host ?? '');
     const hostValid = /^[A-Za-z0-9.\-]+(:\d+)?$/u.test(host);
     const isLoopbackHost = /^(127\.0\.0\.1|localhost)(:\d+)?$/iu.test(host);

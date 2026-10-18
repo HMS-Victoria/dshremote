@@ -35,6 +35,19 @@ Write-Host ''
 
 $urls = @()
 if ($localPairing -and $localPairing.urls) { $urls = @($localPairing.urls) }
+if ($localPairing -and $localPairing.publicPairUrl) {
+    $publicShown = $localPairing.publicPairUrl -replace 'code=[^&]+', ('code=' + $code)
+    Write-Host ' 二维码/外网地址（优先使用）:' -ForegroundColor Green
+    Write-Host ('   ' + $publicShown)
+    Write-Host ''
+}
+if ($localPairing -and $localPairing.tailscaleUrls) {
+    foreach ($url in @($localPairing.tailscaleUrls)) {
+        $shown = $url -replace 'code=[^&]+', ('code=' + $code)
+        Write-Host (' Tailscale: ' + $shown) -ForegroundColor Cyan
+    }
+    Write-Host ''
+}
 if ($urls.Count -gt 0) {
     Write-Host ' 手机打开（同一 Wi-Fi）:'
     foreach ($url in $urls) {

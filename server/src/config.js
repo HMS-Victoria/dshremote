@@ -53,6 +53,11 @@ export const DEFAULTS = {
   hostEventsFile: null,
   /** 是否在启动时打印所有局域网地址 */
   printLanUrls: true,
+  /**
+   * 外网访问地址（如 Tailscale 的 http://100.x.x.x:7801、frp/域名的 https://...）。
+   * 设置后二维码/配对信息优先用它；为空时自动检测 Tailscale 地址，其次局域网。
+   */
+  publicUrl: null,
 };
 
 function deepMerge(base, extra) {
@@ -77,6 +82,7 @@ function fromEnv(config) {
   if (env.DSHREMOTE_HOST_PROFILE) config.hostProfile = env.DSHREMOTE_HOST_PROFILE;
   if (env.DSHREMOTE_HOST_FILE) config.hostFile = env.DSHREMOTE_HOST_FILE;
   if (env.DSHREMOTE_HOST_EVENTS_FILE) config.hostEventsFile = env.DSHREMOTE_HOST_EVENTS_FILE;
+  if (env.DSHREMOTE_PUBLIC_URL) config.publicUrl = env.DSHREMOTE_PUBLIC_URL;
   return config;
 }
 

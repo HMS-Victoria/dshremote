@@ -41,8 +41,9 @@ foreach ($name in $toolNames) {
     Copy-Item $source (Join-Path $stage 'tools\')
 }
 
-# 测试说明
+# 测试说明 + 外网访问说明
 Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-测试说明.md')
+Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（Tailscale）.md')
 
 # APK（可选）
 if (-not $NoApk) {

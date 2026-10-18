@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -17,6 +17,23 @@ const COLLAPSED_SELECTOR = '[class*="_collapsed"]';
 
 root.classList.add('dsh-mobile');
 root.dataset.dshremoteVersion = VERSION;
+
+/**
+ * 兜底：部分 WebView（旧内核/模拟器）里 100vh / 100dvh / 100% 会算成 0，
+ * 导致整个 DSH 布局高度为 0、页面全黑。这里把真实视口高度写成 CSS 变量，
+ * mobile.css 里用它兜底撑开 html/body/#root。
+ */
+function installViewportHeight() {
+  const apply = () => {
+    const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (height > 0) root.style.setProperty('--dshremote-vh', `${height}px`);
+  };
+  apply();
+  window.addEventListener('resize', apply);
+  window.visualViewport?.addEventListener('resize', apply);
+}
+
+installViewportHeight();
 
 function log(...args) {
   console.log('[dshremote]', ...args);

@@ -1,6 +1,7 @@
 package dev.dshremote.app
 
 import android.os.Bundle
+import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -18,6 +19,8 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 允许通过 chrome://inspect / CDP 调试 WebView（仅对调试用途有价值）
+        WebView.setWebContentsDebuggingEnabled(true)
         val store = SessionStore(this)
 
         setContent {

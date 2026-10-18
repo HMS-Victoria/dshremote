@@ -1,7 +1,7 @@
 # dshremote 设计方案
 
-> 状态：Phase 0 + M2 完成；**M3 Android 混合壳已产出 APK**（2026-10-18，待真机验证）；
-> M1/M4 待办
+> 状态：Phase 0 + M2 完成；**M3 Android 混合壳已完成模拟器端到端验证**
+> （2026-10-18，同一 APK 待用户真机确认）；M1/M4 待办
 > 最后更新：2026-10-18
 
 ## 0. 实施进度
@@ -18,12 +18,20 @@
 - **原生连接菜单**：注入脚本里长按左上角悬浮按钮可调用 `window.DshRemoteNative.showMenu()`
   （刷新页面 / 切换服务器 / 退出）；
 - 构建脚本 `tools/build-android.mjs`，产物：
-  `android/app/build/outputs/apk/debug/app-debug.apk`（9.5MB debug，包名
+  `android/app/build/outputs/apk/debug/app-debug.apk`（约 10MB debug，包名
   `dev.dshremote.app`，minSdk 26 / target 35）；`dist/dshremote-0.1.0-debug.apk` 为副本；
-- 已验证：APK badging 正常、Gradle wrapper 可用、daemon 的 POST 配对 API 返回令牌。
+- **模拟器端到端验证通过**（Android 35 x86_64 模拟器，720×1280）：
+  配对页输入服务器 + 配对码 → 成功换取令牌 → WebView 加载 DSH 界面（移动注入生效：
+  悬浮菜单、工作区选择、输入区、状态条渲染正常）；Android 返回键可关闭移动端抽屉；
+- 验证过程中发现并修复：**旧 WebView（124）里 `100vh/100dvh/100%` 会算成 0**，
+  导致整页高度 0、全黑。已在 `mobile.js` 注入口注入 `--dshremote-vh`（真实 innerHeight）
+  并由 `mobile.css` 兜底撑开 html/body/#root（mobile shell v0.2.2）；
+- 验证工具：`tools/cdp.mjs` 新增 `--connect-port`，可直连 Android WebView 的 CDP
+  （经 `adb forward`），导出 DOM/截图/console 日志——模拟器软件 GPU 下系统截屏不可靠，
+  这是更可靠的验证方式。
 
-待办：真机安装验证（配对 → WebView 加载 → 输入/文件选择/返回键）；通知功能推迟到
-事件通道（daemon 侧）就绪后实现；后续可加扫码配对（QR）。
+待办：用户真机安装确认；扫码配对（QR + 相机权限）；通知（依赖 daemon 事件通道）；
+重新配对/失效令牌的提示。
 
 ### M2（2026-10-18）：移动端适配核心可用
 

@@ -37,6 +37,8 @@ function parseArgs(argv) {
       case '--steps': result.steps = argv[++i]; break;
       case '--edge': result.edge = argv[++i]; break;
       case '--port': result.port = Number(argv[++i]); break;
+      case '--connect-port': result.connectPort = Number(argv[++i]); break;
+      case '--reload': result.reload = true; break;
       case '--no-mobile': result.mobile = false; break;
       case '--help':
         console.log('用法: node tools/cdp.mjs --url <url> [--width 390] [--height 844] [--wait 8000] [--screenshot out.png] [--dom out.html]');
@@ -45,7 +47,7 @@ function parseArgs(argv) {
       default: throw new Error(`未知参数: ${key}`);
     }
   }
-  if (!result.url) throw new Error('缺少 --url');
+  if (!result.url && result.connectPort === undefined) throw new Error('缺少 --url');
   return result;
 }
 
@@ -105,6 +107,14 @@ class CdpClient {
     this.nextId = 0;
     this.pending = new Map();
     this.eventWaiters = new Map();
+    this.handlers = new Map();
+  }
+
+  /** 订阅某个 CDP 事件（可多个监听）。 */
+  on(method, handler) {
+    const list = this.handlers.get(method) ?? [];
+    list.push(handler);
+    this.handlers.set(method, list);
   }
 
   async connect() {
@@ -122,6 +132,9 @@ class CdpClient {
         if (message.error) pending.reject(new Error(`${message.error.message} (${message.error.code})`));
         else pending.resolve(message.result);
         return;
+      }
+      for (const handler of this.handlers.get(message.method) ?? []) {
+        try { handler(message.params); } catch { /* ignore */ }
       }
       const waiters = this.eventWaiters.get(message.method);
       if (waiters) {
@@ -157,54 +170,88 @@ class CdpClient {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const edge = args.edge ?? EDGE_DEFAULT;
+  const connectPort = args.connectPort;
   const port = args.port ?? await getFreePort();
-  const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'dshremote-cdp-'));
-  let browser;
+  const userDataDir = connectPort === undefined
+    ? await mkdtemp(path.join(os.tmpdir(), 'dshremote-cdp-'))
+    : null;
+  let browser = null;
   const client = { close() {} };
   try {
-    browser = spawn(edge, [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--no-sandbox',
-      '--disable-extensions',
-      '--hide-scrollbars',
-      `--remote-debugging-port=${port}`,
-      `--user-data-dir=${userDataDir}`,
-      'about:blank',
-    ], { stdio: 'ignore', windowsHide: true });
-
-    await waitForBrowser(port);
-    const target = await fetchJson(
-      `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
-      { method: 'PUT' },
-    );
-    const cdp = new CdpClient(target.webSocketDebuggerUrl);
-    client.close = () => cdp.close();
-    await cdp.connect();
-
-    await cdp.send('Page.enable');
-    await cdp.send('Runtime.enable');
-    await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: args.width,
-      height: args.height,
-      deviceScaleFactor: args.mobile ? 2 : 1,
-      mobile: args.mobile,
-      screenOrientation: { type: 'portraitPrimary', angle: 0 },
-    });
-    if (args.mobile) {
-      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-      await cdp.send('Emulation.setUserAgentOverride', {
-        userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+    let cdp;
+    if (connectPort !== undefined) {
+      // 连接已存在的调试端点（例如 Android WebView 经 adb forward 暴露的 CDP）
+      const targets = await fetchJson(`http://127.0.0.1:${connectPort}/json/list`);
+      const page = targets.find((entry) => entry.type === 'page') ?? targets[0];
+      if (page === undefined) throw new Error('CDP 端点没有可用的页面 target');
+      cdp = new CdpClient(page.webSocketDebuggerUrl);
+      client.close = () => cdp.close();
+      await cdp.connect();
+      await cdp.send('Page.enable');
+      await cdp.send('Runtime.enable');
+      await cdp.send('Log.enable').catch(() => {});
+      // 打印页面 console / 异常，便于排查 WebView 里的问题
+      cdp.on('Runtime.consoleAPICalled', (params) => {
+        const text = (params.args ?? []).map((arg) => arg.value ?? arg.description ?? '').join(' ');
+        console.log(`[console.${params.type}] ${String(text).slice(0, 500)}`);
       });
-    }
+      cdp.on('Runtime.exceptionThrown', (params) => {
+        const details = params.exceptionDetails ?? {};
+        console.error(`[exception] ${details.text ?? ''} ${details.exception?.description ?? ''}`.slice(0, 800));
+      });
+      cdp.on('Log.entryAdded', (params) => {
+        const entry = params.entry ?? {};
+        console.log(`[log.${entry.level}] ${String(entry.text ?? '').slice(0, 500)}`);
+      });
+      if (args.reload) {
+        await cdp.send('Page.reload', { ignoreCache: true });
+      }
+      await sleep(args.wait);
+    } else {
+      browser = spawn(edge, [
+        '--headless=new',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--no-sandbox',
+        '--disable-extensions',
+        '--hide-scrollbars',
+        `--remote-debugging-port=${port}`,
+        `--user-data-dir=${userDataDir}`,
+        'about:blank',
+      ], { stdio: 'ignore', windowsHide: true });
 
-    const loaded = cdp.waitForEvent('Page.loadEventFired', 30_000);
-    const navigation = await cdp.send('Page.navigate', { url: args.url });
-    if (navigation.errorText) throw new Error(`导航失败: ${navigation.errorText}`);
-    await loaded;
-    await sleep(args.wait);
+      await waitForBrowser(port);
+      const target = await fetchJson(
+        `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
+        { method: 'PUT' },
+      );
+      cdp = new CdpClient(target.webSocketDebuggerUrl);
+      client.close = () => cdp.close();
+      await cdp.connect();
+
+      await cdp.send('Page.enable');
+      await cdp.send('Runtime.enable');
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: args.width,
+        height: args.height,
+        deviceScaleFactor: args.mobile ? 2 : 1,
+        mobile: args.mobile,
+        screenOrientation: { type: 'portraitPrimary', angle: 0 },
+      });
+      if (args.mobile) {
+        await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+        await cdp.send('Emulation.setUserAgentOverride', {
+          userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        });
+      }
+
+      const loaded = cdp.waitForEvent('Page.loadEventFired', 30_000);
+      const navigation = await cdp.send('Page.navigate', { url: args.url });
+      if (navigation.errorText) throw new Error(`导航失败: ${navigation.errorText}`);
+      await loaded;
+      await sleep(args.wait);
+    }
 
     if (args.click) {
       const clickResult = await cdp.send('Runtime.evaluate', {
@@ -355,7 +402,9 @@ async function main() {
     client.close();
     await killProcessTree(browser);
     await sleep(300);
-    await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+    if (userDataDir !== null) {
+      await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }
 

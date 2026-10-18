@@ -693,7 +693,8 @@ html.dsh-mobile [class*="sessionRow"] [class*="time"] {
   flex-direction: column;
   width: 100%;
   max-width: 520px;
-  max-height: min(78vh, var(--dshremote-vh, 100vh));
+  /* 不能用 vh：部分 WebView（华为 ArkWeb）里 vh 会算成 0，导致高度塌成 0、内容溢出屏幕 */
+  max-height: 78%;
   padding: 14px 16px calc(14px + var(--dsh-safe-bottom));
   border-radius: 18px 18px 0 0;
   background: var(--dshremote-panel-bg);

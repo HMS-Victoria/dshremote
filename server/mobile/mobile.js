@@ -8,7 +8,7 @@
  *  - 抽屉打开时显示遮罩；点遮罩或会话项自动收起；
  *  - 通过 MutationObserver 同步 DSH 自己切换的状态。
  */
-const VERSION = '0.2.5';
+const VERSION = '0.2.6';
 const root = document.documentElement;
 
 const SIDEBAR_SELECTOR = '[class*="BynINW_sidebarCol"]';
@@ -227,6 +227,27 @@ function init() {
       return true;
     }
     return false;
+  };
+
+  // 原生菜单“设置”入口：打开抽屉 → 点头像 → 点“设置”
+  window.dshremoteOpenSettings = () => {
+    try {
+      if (!isDrawerOpen()) toggleDrawer();
+      setTimeout(() => {
+        const account = document.querySelector('[aria-label="账号菜单"]');
+        if (account === null) return;
+        account.click();
+        setTimeout(() => {
+          const menu = document.querySelector('[class*="_surface_ri079"]');
+          const item = menu === null
+            ? null
+            : [...menu.querySelectorAll('button')].find((button) => (button.textContent || '').trim().startsWith('设置'));
+          item?.click();
+        }, 260);
+      }, 260);
+    } catch (error) {
+      log(`打开设置失败: ${error}`);
+    }
   };
 
   if (location.hash.includes('dshremote-debug')) root.classList.add('dsh-mobile-debug');

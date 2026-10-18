@@ -157,10 +157,19 @@ fun WebViewScreen(
             title = { Text("连接") },
             text = { Text(serverUrl) },
             confirmButton = {
-                TextButton(onClick = {
-                    showMenu = false
-                    webView?.reload()
-                }) { Text("刷新页面") }
+                Row(horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        showMenu = false
+                        webView?.evaluateJavascript(
+                            "window.dshremoteOpenSettings && window.dshremoteOpenSettings()",
+                            null,
+                        )
+                    }) { Text("设置") }
+                    TextButton(onClick = {
+                        showMenu = false
+                        webView?.reload()
+                    }) { Text("刷新页面") }
+                }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.End) {

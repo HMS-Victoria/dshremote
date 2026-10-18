@@ -229,6 +229,34 @@ const BOOT_INLINE = `
       message: String(reason && reason.message ? reason.message : reason).slice(0, 300)
     });
   });
+
+  // 上报视口尺寸，方便定位“底部被裁掉/滚动条错位”这类真机问题
+  function reportViewport() {
+    try {
+      var viewport = window.visualViewport;
+      report({
+        event: 'viewport',
+        message: JSON.stringify({
+          innerW: window.innerWidth,
+          innerH: window.innerHeight,
+          vvW: viewport ? Math.round(viewport.width) : null,
+          vvH: viewport ? Math.round(viewport.height) : null,
+          docH: document.documentElement.clientHeight,
+          bodyH: document.body ? document.body.clientHeight : null,
+          dpr: window.devicePixelRatio,
+          screenW: window.screen ? window.screen.width : null,
+          screenH: window.screen ? window.screen.height : null,
+          vhVar: getComputedStyle(root).getPropertyValue('--dshremote-vh').trim()
+        })
+      });
+    } catch (error) { /* ignore */ }
+  }
+  window.addEventListener('load', function () {
+    setTimeout(reportViewport, 900);
+  });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(reportViewport, 500);
+  });
 })();
 </script>
 <!-- dshremote-boot -->

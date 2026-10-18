@@ -25,6 +25,18 @@ html.dsh-mobile {
   /* --dshremote-vh 由 mobile.js 按真实 innerHeight 注入；部分 WebView 里
      100vh/100dvh/100% 会算成 0，用它兜底撑开页面高度。 */
   height: var(--dshremote-vh, 100%);
+  scrollbar-width: none;
+}
+
+/* WebView 里浏览器滚动条会常驻且样式突兀（灰色横条），移动端一律隐藏 */
+html.dsh-mobile * {
+  scrollbar-width: none;
+}
+
+html.dsh-mobile ::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
 html.dsh-mobile body {
@@ -88,6 +100,9 @@ html.dsh-mobile [class*="BynINW_sidebarCol"] {
   background: var(--dshremote-panel-bg) !important;
   overflow: hidden !important;
   padding-top: var(--dsh-safe-top) !important;
+  /* 底部留白：避免账号行/头像贴着屏幕底边被裁切或难以点按 */
+  padding-bottom: max(10px, var(--dsh-safe-bottom)) !important;
+  box-sizing: border-box !important;
 }
 
 html.dsh-mobile-drawer-open [class*="BynINW_sidebarCol"] {

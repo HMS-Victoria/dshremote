@@ -17,7 +17,7 @@ import { DeviceStore } from './auth.js';
 import { DshHost, ExportedHost, dshHomeDir, exportedHostPath } from './dsh-host.js';
 import { HostEventBus } from './host-events.js';
 import { createProxy } from './proxy.js';
-import { isPrivateHostname, lanUrls, tailscaleUrls } from './net.js';
+import { isPrivateHostname, lanUrls } from './net.js';
 
 const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);
 
@@ -143,8 +143,7 @@ async function main() {
   const pairingFile = path.join(DATA_DIR, 'pairing.json');
   let port = 0;
   let urls = [];
-  let tailscale = [];
-  /** 二维码/配对信息里优先使用的外网基地址（publicUrl 配置 > Tailscale > 局域网）。 */
+  /** 二维码/配对信息里优先使用的地址（publicUrl 配置，例如 WireGuard 内网地址）。 */
   let preferredPairBase = null;
 
   const writePairingInfo = async (current, reason) => {
@@ -155,7 +154,6 @@ async function main() {
         localUrl: `http://127.0.0.1:${port}/pair?code=${current.code}`,
         publicUrl: preferredPairBase,
         publicPairUrl: preferredPairBase === null ? null : `${preferredPairBase}/pair?code=${current.code}`,
-        tailscaleUrls: tailscale.map((entry) => `${entry.url}/pair?code=${current.code}`),
         urls: urls.map((entry) => `${entry.url}/pair?code=${current.code}`),
         oneTime: devices.oneTime,
         reason,
@@ -191,7 +189,6 @@ async function main() {
     pairServerUrls: () => {
       const list = [];
       for (const entry of urls) list.push(entry.url);
-      for (const entry of tailscale) list.push(entry.url);
       if (config.publicUrl) list.push(config.publicUrl);
       return list;
     },
@@ -207,8 +204,7 @@ async function main() {
 
   const localUrl = `http://127.0.0.1:${port}`;
   urls = config.printLanUrls ? lanUrls(port) : [];
-  tailscale = tailscaleUrls(port);
-  preferredPairBase = config.publicUrl || tailscale[0]?.url || null;
+  preferredPairBase = config.publicUrl || null;
   log('==============================================');
   log(' dshremote 已启动');
   log(` 宿主模式: ${upstream.mode === 'plugin' ? '接管模式（插件导出的桌面宿主）' : '自启模式（独立 dsh web 宿主）'}`);
@@ -216,13 +212,6 @@ async function main() {
   log(` 本机调试: ${localUrl}/pair?code=${pairing.code}`);
   for (const entry of urls) {
     log(` 手机访问: ${entry.url}/pair?code=${pairing.code}   (${entry.name})`);
-  }
-  if (tailscale.length > 0) {
-    for (const entry of tailscale) {
-      log(` Tailscale: ${entry.url}/pair?code=${pairing.code}   (${entry.name})`);
-    }
-  } else if (!config.publicUrl) {
-    log(' Tailscale: 未检测到（装好 Tailscale 并登录后重启 daemon 会自动启用）');
   }
   if (config.publicUrl) {
     log(` 外网地址: ${config.publicUrl}/pair?code=${pairing.code}   (publicUrl)`);

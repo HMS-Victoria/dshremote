@@ -40,7 +40,7 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
   const events = [];
   /**
    * 公网配对地址信息（来自 publicUrl）。
-   * 只有“公网域名”才需要公网配对窗口；EasyTier/Tailscale/局域网等私有地址不算公网。
+   * 只有“公网域名”才需要公网配对窗口；WireGuard/局域网等私有地址不算公网。
    */
   const publicHostInfo = (() => {
     if (typeof publicUrl !== 'string' || publicUrl === '') return null;
@@ -225,7 +225,7 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
    * @param {import('node:http').IncomingMessage} req
    */
   function pairBaseUrl(req) {
-    // 优先用外网/Tailscale 地址（daemon 检测或配置提供），手机在外网扫码也能连
+    // 优先用配置提供的外网/内网地址（例如 WireGuard），手机在外网扫码也能连
     const preferred = typeof preferPairBase === 'function' ? preferPairBase(req) : null;
     if (typeof preferred === 'string' && preferred !== '') return preferred;
     const host = String(req.headers.host ?? '');
@@ -366,12 +366,12 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
       ok: true,
       token: issued.token,
       device: { id: issued.device.id, name: issued.device.name },
-      // 可用的服务器地址（Tailscale / 局域网等），App 可自动选择当前可达的那个
+      // 可用的服务器地址（WireGuard / 局域网等），App 可自动选择当前可达的那个
       serverUrls: pairServerUrlList(req),
     });
   }
 
-  /** 收集该 daemon 的所有可达地址（优先用请求 Host，其次局域网/Tailscale/publicUrl）。 */
+  /** 收集该 daemon 的所有可达地址（优先用请求 Host，其次局域网/publicUrl）。 */
   function pairServerUrlList(req) {
     const list = new Set();
     // 手机端用不到的地址：本机回环、Clash 虚拟网卡

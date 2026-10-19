@@ -248,7 +248,7 @@ cc-remote 这类工具，但深度利用 DSH 自身的 Host/Client 架构。
 
 - 手机能**实时接管桌面 DSH 正在跑的会话**：看流式输出、回答审批、继续对话、看会话历史。
 - Android 原生 App（第一版为"原生外壳 + WebView 承载 DSH 界面"的混合形态）。
-- 网络：**局域网先行**，架构上预留内网穿透（Cloudflare Tunnel / frp / Tailscale 等）。
+- 网络：**WireGuard 点对点**（公网只开 UDP 51820），局域网可作为可选直连。
 - 安全：配对令牌 + 审计；DSH 等价于远程 RCE，默认只对可信网络开放。
 
 ## 2. 已确认的决策
@@ -363,7 +363,7 @@ App 只配置 `serverUrl + deviceToken`，底层可切换：
 1. 局域网（当前开发）：`http://192.168.x.x:7801`
 2. Cloudflare Tunnel：daemon 管理 cloudflared，输出 `https://xxx.trycloudflare.com`
 3. 自建 frp：模板配置（frps 在 VPS，frpc 在 PC）
-4. Tailscale 类虚拟专网：直接用 100.x IP
+4. WireGuard 私有网络：直接用 10.9.0.x IP
 
 ## 6. Android App 设计（混合优先）
 

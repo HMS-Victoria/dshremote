@@ -1,4 +1,4 @@
-﻿# 设置外网访问地址（用于 Tailscale Funnel / frp / 域名等隧道）
+﻿# 设置对外访问地址（用于 frp / 域名等隧道；WireGuard 场景一般不需要）
 # 用法：
 #   .\tools\set-public-url.ps1 -Url "https://your-pc.tailnet-name.ts.net"
 #   .\tools\set-public-url.ps1 -Url "https://xxxx.frp.example.com" -Restart

@@ -60,8 +60,8 @@ export const DEFAULTS = {
   /** 是否在启动时打印所有局域网地址 */
   printLanUrls: true,
   /**
-   * 外网访问地址（如 Tailscale 的 http://100.x.x.x:7801、frp/域名的 https://...）。
-   * 设置后二维码/配对信息优先用它；为空时自动检测 Tailscale 地址，其次局域网。
+   * 外网/内网访问地址（如 WireGuard 的 http://10.9.0.1:7801、frp/域名的 https://...）。
+   * 设置后二维码/配对信息优先用它；为空时回退到局域网地址。
    */
   publicUrl: null,
 };

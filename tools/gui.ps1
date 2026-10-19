@@ -2,7 +2,7 @@
 #
 # 双击项目根目录下的 dshremote-gui.cmd 启动。
 # 功能：查看/启动/停止 daemon、显示配对码与二维码入口、管理已配对设备、
-#       查看 Tailscale 状态、开关开机自启、打开日志。
+#       查看 WireGuard 状态、开关开机自启、打开日志。
 param(
     [string]$Screenshot = ''
 )
@@ -16,7 +16,7 @@ $dataDir = Join-Path $root '.data'
 $runtimeFile = Join-Path $dataDir 'runtime.json'
 $configFile = Join-Path $dataDir 'config.json'
 $daemonBase = 'http://127.0.0.1:7801'
-$tailscaleExe = 'C:\Program Files\Tailscale\tailscale.exe'
+$wireguardExe = 'C:\Program Files\WireGuard\wireguard.exe'
 
 function Get-DaemonHealth {
     try {
@@ -55,25 +55,20 @@ function Get-ServerAddress {
             # 忽略损坏配置
         }
     }
-    try {
-        $status = & $tailscaleExe status 2>&1 | Select-Object -First 1
-        if ($status -and $status -match '^(\d+\.\d+\.\d+\.\d+)') { $ip = $Matches[1] }
-    } catch {
-        # Tailscale 未安装
-    }
-    if ($ip -ne '') { return 'http://' + $ip + ':7801' }
     return 'http://127.0.0.1:7801'
 }
 
-function Get-TailscaleSummary {
-    if (-not (Test-Path $tailscaleExe)) { return '未安装' }
+function Get-WireGuardSummary {
     try {
-        $status = & $tailscaleExe status 2>&1 | Select-Object -First 1
-        if (-not $status) { return '未登录/未连接' }
-        if ($status -match '^(\d+\.\d+\.\d+\.\d+)\s+(\S+)') { return $Matches[1] + '（在线）' }
-        return [string]$status
+        $service = Get-Service -Name 'WireGuardTunnel$server' -ErrorAction SilentlyContinue
+        if (-not $service -or $service.Status -ne 'Running') { return '未运行' }
+        $wg = 'C:\Program Files\WireGuard\wg.exe'
+        if (-not (Test-Path $wg)) { return '隧道运行中' }
+        $show = & $wg show server 2>&1 | Out-String
+        if ($show -match 'latest handshake:\s*(.+)') { return '已连接（' + $Matches[1].Trim() + '）' }
+        return '隧道运行中'
     } catch {
-        return '未运行'
+        return '未知'
     }
 }
 
@@ -203,12 +198,12 @@ $labelDaemon.AutoSize = $true
 $labelDaemon.Font = $fontSmall
 $panelStatus.Controls.Add($labelDaemon)
 
-$labelTailscale = New-Object System.Windows.Forms.Label
-$labelTailscale.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
-$labelTailscale.Location = New-Object System.Drawing.Point(260, 44)
-$labelTailscale.AutoSize = $true
-$labelTailscale.Font = $fontSmall
-$panelStatus.Controls.Add($labelTailscale)
+$labelWireGuard = New-Object System.Windows.Forms.Label
+$labelWireGuard.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
+$labelWireGuard.Location = New-Object System.Drawing.Point(260, 44)
+$labelWireGuard.AutoSize = $true
+$labelWireGuard.Font = $fontSmall
+$panelStatus.Controls.Add($labelWireGuard)
 
 $labelAutostart = New-Object System.Windows.Forms.Label
 $labelAutostart.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
@@ -320,7 +315,7 @@ $buttonCopyServer.Size = New-Object System.Drawing.Size(110, 32)
 $groupServer.Controls.Add($buttonCopyServer)
 
 $labelServerHint = New-Object System.Windows.Forms.Label
-$labelServerHint.Text = '手机连同一 Tailscale 网络或同一 Wi-Fi；App 0.4.4+ 自动选择可用地址。'
+$labelServerHint.Text = '手机连接 WireGuard 后，DSH App 地址填下面的地址。'
 $labelServerHint.ForeColor = [System.Drawing.Color]::FromArgb(100, 116, 139)
 $labelServerHint.Location = New-Object System.Drawing.Point(16, 150)
 $labelServerHint.AutoSize = $true
@@ -328,7 +323,7 @@ $labelServerHint.Font = $fontSmall
 $groupServer.Controls.Add($labelServerHint)
 
 $labelServerHint2 = New-Object System.Windows.Forms.Label
-$labelServerHint2.Text = 'Tailscale 与梯子互斥：用 DSH 时先关梯子。'
+$labelServerHint2.Text = 'WireGuard 与梯子互斥：用 DSH 时先关梯子。'
 $labelServerHint2.ForeColor = [System.Drawing.Color]::FromArgb(100, 116, 139)
 $labelServerHint2.Location = New-Object System.Drawing.Point(16, 170)
 $labelServerHint2.AutoSize = $true
@@ -368,8 +363,8 @@ $buttonLog = New-Button '查看日志' 90
 $panelTools.Controls.Add($buttonLog)
 $buttonFolder = New-Button '打开项目目录' 110
 $panelTools.Controls.Add($buttonFolder)
-$buttonTailscale = New-Button '打开 Tailscale' 110
-$panelTools.Controls.Add($buttonTailscale)
+$buttonWireGuard = New-Button '打开 WireGuard' 110
+$panelTools.Controls.Add($buttonWireGuard)
 $buttonLan = New-Button '局域网直连：检查中' 170
 $panelTools.Controls.Add($buttonLan)
 
@@ -387,7 +382,7 @@ function Refresh-Ui {
         $labelDaemon.Text = 'daemon：未运行'
         $labelDaemon.ForeColor = [System.Drawing.Color]::FromArgb(248, 113, 113)
     }
-    $labelTailscale.Text = 'Tailscale：' + (Get-TailscaleSummary)
+    $labelWireGuard.Text = 'WireGuard：' + (Get-WireGuardSummary)
     $auto = Get-AutostartState
     $labelAutostart.Text = '开机自启：' + $auto.text
     if (Get-LanRuleEnabled) {
@@ -490,11 +485,11 @@ $buttonLog.Add_Click({
     if (Test-Path $logFile) { Start-Process notepad.exe $logFile } else { [System.Windows.Forms.MessageBox]::Show('还没有日志文件。', '提示') }
 })
 $buttonFolder.Add_Click({ Start-Process explorer.exe $root })
-$buttonTailscale.Add_Click({
-    if (Test-Path $tailscaleExe) {
-        Start-Process $tailscaleExe
+$buttonWireGuard.Add_Click({
+    if (Test-Path $wireguardExe) {
+        Start-Process $wireguardExe
     } else {
-        Start-Process 'https://tailscale.com/download'
+        Start-Process 'https://www.wireguard.com/install/'
     }
 })
 $buttonLan.Add_Click({

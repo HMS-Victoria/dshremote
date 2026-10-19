@@ -49,7 +49,7 @@ foreach ($name in $toolNames) {
 # 测试说明 + 外网访问说明
 Copy-Item (Join-Path $root 'dshremote-gui.cmd') $stage
 Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-测试说明.md')
-Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（Tailscale）.md')
+Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（WireGuard）.md')
 Copy-Item (Join-Path $root 'docs\security.md') (Join-Path $stage '安全说明.md')
 
 # APK（可选）
@@ -58,6 +58,8 @@ if (-not $NoApk) {
     if (-not (Test-Path $apk)) { throw "找不到 APK: $apk（先构建或用 -NoApk）" }
     New-Item -ItemType Directory -Force -Path (Join-Path $stage 'dist') | Out-Null
     Copy-Item $apk (Join-Path $stage 'dist\')
+    $wgApk = Join-Path $root 'dist\wireguard-android.apk'
+    if (Test-Path $wgApk) { Copy-Item $wgApk (Join-Path $stage 'dist\') }
 }
 
 # 版本信息
@@ -84,6 +86,7 @@ Get-ChildItem $stage -Recurse -File | ForEach-Object {
 }
 Write-Host ''
 Write-Host ('ZIP: ' + $zip + '  (' + [math]::Round((Get-Item $zip).Length / 1MB, 1) + ' MB)') -ForegroundColor Green
+
 
 
 

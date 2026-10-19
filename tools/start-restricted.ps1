@@ -1,4 +1,4 @@
-# 用「受限令牌」以普通用户权限运行 DSH + dshremote daemon（管理员登录不变）
+﻿# 用「受限令牌」以普通用户权限运行 DSH + dshremote daemon（管理员登录不变）
 #
 # 原理：runas /trustlevel:0x20000 会生成一个受限令牌（Basic User），
 # DSH/daemon 进程里没有管理员权限，但仍然是你的用户身份（可以读写你的文件）。
@@ -205,20 +205,14 @@ $privFile = Join-Path $dataDir 'restricted-privs.txt'
 Start-Sleep -Seconds 2
 
 $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
-$tailscaleExe = @(
-    'C:\Program Files\Tailscale\tailscale.exe',
-    (Join-Path $env:LOCALAPPDATA 'Tailscale\tailscale.exe')
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $tailscaleExe) { $tailscaleExe = 'tailscale' }
-$tailscale = & $tailscaleExe funnel status 2>&1 | Out-String
-$funnelOn = $tailscale -match 'Funnel on'
-
+$wgService = Get-Service -Name 'WireGuardTunnel$server' -ErrorAction SilentlyContinue
+$wgOn = $wgService -and $wgService.Status -eq 'Running'
 Write-Host ''
 Write-Host '==============================================' -ForegroundColor Green
 Write-Host ' 已切换到受限令牌模式' -ForegroundColor Green
 Write-Host (" daemon pid:  " + $runtime.pid)
 Write-Host (" 宿主模式:    " + $runtime.hostMode + "（" + $runtime.upstream + "）")
-Write-Host (" 公网入口:    " + $(if ($funnelOn) { 'Tailscale Funnel 已开启' } else { 'Funnel 未开启（需要时运行: tailscale funnel 7801）' }))
+Write-Host (" WireGuard:   " + $(if ($wgOn) { '隧道运行中（10.9.0.1）' } else { '隧道未运行' }))
 Write-Host (" 权限清单:    " + $privFile)
 Write-Host '==============================================' -ForegroundColor Green
 Write-Host ''

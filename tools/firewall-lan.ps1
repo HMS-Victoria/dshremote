@@ -2,7 +2,7 @@
 #
 # 用法（需要管理员权限）：
 #   .\tools\firewall-lan.ps1 -Enable     # 允许局域网直连
-#   .\tools\firewall-lan.ps1 -Disable    # 禁止局域网直连（只保留 Tailscale 等规则）
+#   .\tools\firewall-lan.ps1 -Disable    # 禁止局域网直连（只保留 WireGuard 等规则）
 #   .\tools\firewall-lan.ps1 -Status     # 查看状态
 param(
     [switch]$Enable,
@@ -46,7 +46,7 @@ if ($Enable) {
 } else {
     if ($existing) {
         Remove-NetFirewallRule -DisplayName $ruleName
-        Write-Host '已禁止局域网直连 7801（Tailscale 访问不受影响）。' -ForegroundColor Green
+        Write-Host '已禁止局域网直连 7801（WireGuard 访问不受影响）。' -ForegroundColor Green
     } else {
         Write-Host '本来就是禁止状态。' -ForegroundColor DarkGray
     }

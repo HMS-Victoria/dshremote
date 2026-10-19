@@ -62,15 +62,8 @@ if ($localPairing -and $localPairing.publicPairUrl) {
     Write-Host ('   ' + $publicShown)
     Write-Host ''
 }
-if ($localPairing -and $localPairing.tailscaleUrls) {
-    foreach ($url in @($localPairing.tailscaleUrls)) {
-        $shown = $url -replace 'code=[^&]+', ('code=' + $code)
-        Write-Host (' Tailscale: ' + $shown) -ForegroundColor Cyan
-    }
-    Write-Host ''
-}
 if ($urls.Count -gt 0) {
-    Write-Host ' 手机打开（局域网地址，需防火墙放行；当前仅 Tailscale 网段放行）:'
+    Write-Host ' 手机打开（局域网 / WireGuard 地址）:'
     foreach ($url in $urls) {
         $shown = $url -replace 'code=[^&]+', ('code=' + $code)
         Write-Host ('   ' + $shown)

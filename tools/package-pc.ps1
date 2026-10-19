@@ -3,9 +3,9 @@
 # 用法：在项目根目录执行
 #   .\tools\package-pc.ps1                 # 打包（含 APK）
 #   .\tools\package-pc.ps1 -NoApk          # 不含 APK（更小的包）
-#   .\tools\package-pc.ps1 -Version 0.4.4  # 指定 APK 版本（默认 0.4.4）
+#   .\tools\package-pc.ps1 -Version 0.4.4  # 指定 APK 版本（默认 0.4.5）
 param(
-    [string]$Version = '0.4.4',
+    [string]$Version = '0.4.5',
     [switch]$NoApk
 )
 
@@ -84,5 +84,6 @@ Get-ChildItem $stage -Recurse -File | ForEach-Object {
 }
 Write-Host ''
 Write-Host ('ZIP: ' + $zip + '  (' + [math]::Round((Get-Item $zip).Length / 1MB, 1) + ' MB)') -ForegroundColor Green
+
 
 

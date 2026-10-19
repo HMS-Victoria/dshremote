@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.dshremote.app.KeepAliveSettings
 import dev.dshremote.app.SessionStore
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -197,6 +198,7 @@ fun WebViewScreen(
     val settingsStore = remember { activity?.let { SessionStore(it) } }
     var notifyApproval by remember { mutableStateOf(settingsStore?.notifyApproval ?: true) }
     var notifyTurns by remember { mutableStateOf(settingsStore?.notifyTurns ?: true) }
+    var showKeepAlive by remember { mutableStateOf(false) }
 
     if (showMenu) {
         AlertDialog(
@@ -253,6 +255,10 @@ fun WebViewScreen(
                 Row(horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = {
                         showMenu = false
+                        showKeepAlive = true
+                    }) { Text("后台保活") }
+                    TextButton(onClick = {
+                        showMenu = false
                         onSwitchServer()
                     }) { Text("切换服务器") }
                     TextButton(onClick = {
@@ -260,6 +266,47 @@ fun WebViewScreen(
                         activity?.finish()
                     }) { Text("退出") }
                 }
+            },
+        )
+    }
+
+    if (showKeepAlive) {
+        val context = LocalContext.current
+        val ignoring = KeepAliveSettings.isIgnoringBatteryOptimizations(context)
+        AlertDialog(
+            onDismissRequest = { showKeepAlive = false },
+            title = { Text("后台保活设置") },
+            text = {
+                Column {
+                    Text(
+                        if (ignoring) "电池优化：已忽略 ✅" else "电池优化：未忽略 ⚠️（后台容易被杀）",
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "华为/荣耀手机建议：\n" +
+                            "1. 设置 → 电池 → 应用启动管理 → DSH Remote → 改为「手动管理」，允许自启动/关联启动/后台活动；\n" +
+                            "2. 设置 → 电池 → 更多电池设置 → 开启「休眠时始终保持网络连接」。\n" +
+                            "完成后，App 被杀掉也会自动拉起重连。",
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        KeepAliveSettings.requestIgnoreBatteryOptimizations(context)
+                    }) { Text("忽略电池优化") }
+                    TextButton(onClick = {
+                        if (!KeepAliveSettings.openVendorStartupManager(context)) {
+                            KeepAliveSettings.openAppSettings(context)
+                        }
+                    }) { Text("启动管理") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKeepAlive = false }) { Text("关闭") }
             },
         )
     }

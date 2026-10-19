@@ -7,8 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.Network
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -44,58 +42,29 @@ class EventService : Service() {
     private lateinit var store: SessionStore
     private var socket: WebSocket? = null
     private var reconnectTimer: Job? = null
-    private var connected = false
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            // 网络恢复/切换（Wi-Fi <-> 4G）时立即重连，不用等退避
-            if (!connected) {
-                attempt = 0
-                connect()
-            }
-        }
-    }
     private var attempt = 0
     private var notificationSeq = 1000
 
     override fun onCreate() {
         super.onCreate()
-        isRunning = true
         store = SessionStore(this)
         createChannels()
         startForeground(NOTIFICATION_SERVICE_ID, buildServiceNotification("正在连接…"))
-        KeepAliveReceiver.schedule(this)
-        runCatching {
-            val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            manager.registerDefaultNetworkCallback(networkCallback)
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            KeepAliveReceiver.cancel(this)
             stopSelf()
             return START_NOT_STICKY
         }
-        KeepAliveReceiver.schedule(this)
         connect()
         return START_STICKY
     }
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        // 从最近任务划掉应用后，尽量在几秒后重新拉起服务（部分 ROM 仍可能阻止）
-        KeepAliveReceiver.scheduleSoon(this)
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
-        isRunning = false
         reconnectTimer?.cancel()
         socket?.close(1000, "service stopped")
         socket = null
-        runCatching {
-            val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            manager.unregisterNetworkCallback(networkCallback)
-        }
         job.cancel()
         super.onDestroy()
     }
@@ -126,7 +95,6 @@ class EventService : Service() {
             socket = client.newWebSocket(request, object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     attempt = 0
-                    connected = true
                     updateServiceNotification("已连接：审批/回合事件监听中")
                 }
 
@@ -135,12 +103,10 @@ class EventService : Service() {
                 }
 
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                    connected = false
                     scheduleReconnect()
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    connected = false
                     updateServiceNotification("连接断开，重试中…")
                     scheduleReconnect()
                 }
@@ -331,12 +297,7 @@ class EventService : Service() {
 
         /** 停止事件订阅（切换服务器/退出时调用）。 */
         fun stop(context: Context) {
-            KeepAliveReceiver.cancel(context)
             context.stopService(Intent(context, EventService::class.java))
         }
-
-        /** 服务是否在运行（保活闹钟用它判断是否需要重新拉起）。 */
-        @Volatile
-        var isRunning: Boolean = false
     }
 }

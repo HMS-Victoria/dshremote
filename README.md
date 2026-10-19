@@ -17,7 +17,7 @@
 > - 文档：方案 [docs/design.md](docs/design.md)、组网 [docs/network.md](docs/network.md)、
 >   Android 构建 [android/README.md](android/README.md)。
 >
-> **APK**：`dist/dshremote-0.4.5-debug.apk`（debug 签名，直接安装）
+> **APK**：`dist/dshremote-0.4.4-debug.apk`（debug 签名，直接安装）
 >
 > **交付测试包**：`.\tools\package-pc.ps1` → `dist\dshremote-pc-0.4.3.zip`
 > （插件 + daemon + 工具脚本 + APK + 测试说明，解压即用）
@@ -86,7 +86,6 @@ DSH agent 能执行任意命令，**能访问 dshremote 就等价于能控制这
 设备令牌只存哈希、30 天过期、最多 5 台设备（同一手机重复配重复用名额）、
 防火墙仅放行 Tailscale 网段。仍建议：DSH 以普通用户/受限令牌运行
 （见 `docs/security.md`），不要把配对码/设备令牌发给他人。
-
 
 
 

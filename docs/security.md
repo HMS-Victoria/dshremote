@@ -88,17 +88,3 @@ C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off   # 关闭
 - **dshremote daemon**：计划任务 `dshremote-daemon`（登录后延迟 20 秒、受限权限后台启动），
   查看/修改：`Get-ScheduledTask -TaskName dshremote-daemon`；
 - 登录 DSH 桌面版后 daemon 会自动以接管模式接入（`.\tools\pair-info.ps1` 可确认）。
-
-## 六、手机端后台保活（防被杀）
-
-华为/荣耀等系统会清理后台应用，导致通知/连接中断。App 0.4.5+ 已内置：
-
-- 保活闹钟：服务被杀后 15 分钟内自动尝试拉起（从最近任务划掉后 3 秒先试一次）；
-- 开机自启：重启手机后自动恢复事件服务；
-- 网络切换（Wi-Fi/4G）：自动立即重连；
-- App 内「返回键 → 后台保活」：一键忽略电池优化、跳转华为「启动管理」页面。
-
-**仍需手动设置一次（系统限制，App 无法自动改）：**
-1. 设置 → 电池 → 应用启动管理 → DSH Remote → 改为「手动管理」，允许自启动/关联启动/后台活动；
-2. 设置 → 电池 → 更多电池设置 → 开启「休眠时始终保持网络连接」。
-

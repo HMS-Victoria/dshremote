@@ -18,7 +18,7 @@
 ## 构建
 
 ```powershell
-cd D:\dshremote
+cd <项目根目录>
 node tools/build-android.mjs
 # 产物：android/app/build/outputs/apk/debug/app-debug.apk
 ```

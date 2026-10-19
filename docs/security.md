@@ -1,10 +1,9 @@
 # 安全加固与「以普通用户权限运行 DSH」
 
-> 当前环境（2026-10-18 检查）已处理项：
-> - Windows 防火墙已启用（此前三个配置文件全部关闭，是最大风险）；
-> - `.data` 权限已收紧（去掉 `Authenticated Users` 继承）；
-> - 公网配对窗口、配对限速、令牌哈希/30 天过期/5 台上限、审计日志已启用；
-> - **待处理**：DSH 和 daemon 仍以 Administrator 运行 → 用本页的受限令牌方案解决。
+> 本项目已内置的安全措施：
+> - 公网配对窗口、配对限速、令牌哈希 / 过期时间 / 设备数量上限、审计日志；
+> - 建议同时启用 Windows 防火墙，并收紧 `.data` 目录权限（去掉 `Authenticated Users` 继承）；
+> - **建议**：DSH 和 daemon 不要以 Administrator 运行 → 用本页的受限令牌方案解决。
 
 ## 一、为什么不能以 Administrator 运行
 
@@ -21,10 +20,10 @@ DSH 能执行命令、写文件；如果它（或手机令牌）被攻击，管�
 
 ### 切换到受限模式
 
-**从文件资源管理器双击**（不要在 DSH 的对话/终端里运行，因为会重启 DSH）：
+**在项目根目录打开文件资源管理器，双击**（不要在 DSH 的对话/终端里运行，因为会重启 DSH）：
 
 ```
-D:\dshremote\tools\switch-to-restricted.cmd
+tools\switch-to-restricted.cmd
 ```
 
 脚本会：
@@ -36,7 +35,7 @@ D:\dshremote\tools\switch-to-restricted.cmd
 ### 验证
 
 ```powershell
-Get-Content D:\dshremote\.data\restricted-privs.txt
+Get-Content .\.data\restricted-privs.txt
 ```
 
 受限身份下权限非常少（实测只有 `SeChangeNotifyPrivilege`），没有
@@ -45,7 +44,7 @@ Get-Content D:\dshremote\.data\restricted-privs.txt
 ### 回退
 
 ```
-D:\dshremote\tools\switch-to-normal.cmd
+tools\switch-to-normal.cmd
 ```
 
 或手动：`.\tools\stop.ps1` → 正常打开 DSH → `.\tools\start.ps1 -Background`
@@ -68,8 +67,8 @@ D:\dshremote\tools\switch-to-normal.cmd
 受限模式不影响公网方案。需要时：
 
 ```powershell
-C:\Program Files\Tailscale\tailscale.exe funnel 7801        # 开启
-C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off   # 关闭
+tailscale funnel 7801        # 开启
+tailscale funnel --https=443 off   # 关闭
 ```
 
 配对新设备前仍然要先运行 `.\tools\pair-open.ps1`。
@@ -82,11 +81,11 @@ C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off   # 关闭
 - DSH 的「完全权限」预设会自动批准工具调用：不要让 Agent 处理不可信的网页/文件内容；
 - Tailscale 账号建议开启 2FA；`*.ts.net` 地址不要外传。
 
-## 五、开机自启（当前已配置）
+## 五、开机自启（可选）
 
-- **Tailscale**：Windows 服务自动启动（登录状态已保存），重启后无需手动操作；
-- **dshremote daemon**：计划任务 `dshremote-daemon`（登录后延迟 20 秒、受限权限后台启动），
-  查看/修改：`Get-ScheduledTask -TaskName dshremote-daemon`；
+- **Tailscale**：Windows 服务自动启动（登录状态已保存）；
+- **dshremote daemon**：可用 `.\tools\install-autostart.ps1` 注册计划任务 `dshremote-daemon`
+  （登录后延迟启动），查看/修改：`Get-ScheduledTask -TaskName dshremote-daemon`；
 - 登录 DSH 桌面版后 daemon 会自动以接管模式接入（`.\tools\pair-info.ps1` 可确认）。
 
 ## 七、配对持久化（0.4.6+）

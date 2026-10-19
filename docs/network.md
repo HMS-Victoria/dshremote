@@ -96,7 +96,7 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 2. 打开 Tailscale 后台 <https://login.tailscale.com/admin>：
    - 在 **DNS** 里启用 HTTPS 证书（HTTPS Certificates）；
    - 在 **Access Controls** 里给节点开放 funnel 权限（nodeAttrs 加 `funnel`；或按后台提示一键启用）；
-3. 在电脑上执行（默认路径可能是 `C:\Program Files\Tailscale\tailscale.exe`）：
+3. 在电脑上执行（`tailscale` 命令；Windows 默认安装路径为 `C:\Program Files\Tailscale\tailscale.exe`）：
    ```powershell
    tailscale funnel 7801
    ```
@@ -144,40 +144,39 @@ $env:DSHREMOTE_PUBLIC_URL = "https://dsh.example.com"
 
 ### 日常使用建议
 
-1. 不需要远程访问时，关掉公网入口：`C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off`；
+1. 不需要远程访问时，关掉公网入口：`tailscale funnel --https=443 off`；
 2. 需要时才开 Funnel，用完关掉；
 3. 给别人测试/临时配对时，配对完立刻确认设备列表：`.\tools\devices.ps1`；
 4. 手机丢了立刻吊销：`.\tools\devices.ps1 -Revoke <id>`；
-5. 长期建议：DSH/daemon 不要用 Administrator 账户运行（当前是 Administrator，权限较高）。
+5. 长期建议：DSH/daemon 不要用 Administrator 账户运行（管理员权限过高，见 [security.md](security.md)）。
 
 ---
 
 
 ---
 
-## 当前采用：Tailscale 私有网络（不开 Funnel）
+## 推荐方案：Tailscale 私有网络（不开 Funnel）
 
-> 2026-10-18 调整：不再使用 EasyTier（官方公共中继域名失效）和 Funnel（公网入口），
-> 手机与电脑登录同一个 Tailscale 账号组成私有网络，手机通过 100.x 访问 daemon。
+> 不使用 EasyTier（官方公共中继域名失效）和 Funnel（公网入口）；
+> 手机与电脑登录同一个 Tailscale 账号组成私有网络，手机通过 100.x 地址访问 daemon。
 
 ### 手机端步骤
 
-1. 安装 Tailscale Android APK：本项目 `dist\tailscale-android-universal-1.104.1.apk`
-   （或从 <https://pkgs.tailscale.com/stable/#android> 下载）；
+1. 安装 Tailscale Android APK（<https://pkgs.tailscale.com/stable/#android>）；
 2. 登录与电脑相同的 Tailscale 账号（电脑托盘里显示的账号）；
 3. 开启 VPN，确认手机拿到 `100.x` 地址；
-4. DSH Remote App → 切换服务器 → `http://100.101.102.103:7801` → 扫码配对
+4. DSH Remote App → 切换服务器 → `http://<电脑 Tailscale IP>:7801` → 扫码配对
    （私有网地址，无需公网配对窗口）；
 5. ⚠️ 手机 Tailscale 与梯子互斥，用 DSH 时先关梯子。
 
-### 电脑端状态
+### 电脑端检查
 
-- Tailscale Windows 客户端（服务自动启动，已登录，IP `100.101.102.103`）；
-- Funnel 已关闭：`tailscale funnel status` 应为 `No serve config`；
-- daemon `publicUrl` = `http://100.101.102.103:7801`，二维码/配对直接用这个地址；
-- 防火墙只放行 Tailscale 网段（`100.64.0.0/10`）访问 7801，宽泛的 Node.js 规则已禁用；
-- Clash TUN 的 fake-IP 会破坏 Tailscale 控制面连接，已用 hosts 指向真实 IP 解决
-  （原 hosts 备份在 `.data\hosts.backup`）；Tailscale 登录异常时先检查 hosts 里那几行。
+- Tailscale Windows 客户端已安装并登录（服务自动启动），IP 形如 `100.x.y.z`；
+- Funnel 未开启：`tailscale funnel status` 应为 `No serve config`；
+- daemon `publicUrl` = `http://<电脑 Tailscale IP>:7801`，二维码/配对直接用这个地址；
+- 防火墙只放行 Tailscale 网段（`100.64.0.0/10`）访问 7801；
+- Clash TUN 的 fake-IP 会破坏 Tailscale 控制面连接，可用 hosts 指向真实 IP 解决；
+  Tailscale 登录异常时先检查 hosts 里那几行。
 
 ### EasyTier 为什么弃用
 

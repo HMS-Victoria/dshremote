@@ -178,10 +178,10 @@
   （经 `adb forward`），导出 DOM/截图/console 日志——模拟器软件 GPU 下系统截屏不可靠，
   这是更可靠的验证方式。
 
-待办：用户真机安装确认；扫码配对（QR + 相机权限）；通知（依赖 daemon 事件通道）；
+待办：真机安装确认；扫码配对（QR + 相机权限）；通知（依赖 daemon 事件通道）；
 重新配对/失效令牌的提示。
 
-**真机兼容性修复（旧 WebView / 华为 ArkWeb）**：真机（某款 Android 手机，Android 12
+**真机兼容性修复（旧 WebView / 华为 ArkWeb）**：真机（一台 Android 12
 兼容层 WebView）出现"一直重新连接中"。通过 daemon 诊断 + 页面内注入的 WebSocket
 监控定位到：WS 握手/鉴权/API 全部正常，但客户端**一帧都收不到**，且页面报
 `Promise.withResolvers is not a function` / `AbortSignal.any is not a function`。
@@ -193,7 +193,7 @@ WebSocket 关闭码上报（`POST /__dshremote/client-log`）。用"删除这些
 的模拟旧内核测试验证：mux 帧收发恢复正常、无重连。另新增 daemon
 `/__dshremote/diag` 诊断端点与 `tools/diag.ps1`。
 
-**真机验证通过（2026-10-18 13:05）**：用户确认"可以连接了"，daemon 诊断中手机侧
+**真机验证通过（2026-10-18 13:05）**：手机端确认"可以连接了"，daemon 诊断中手机侧
 只剩正常 API 请求，WS 不再抖动。M3 完成。
 
 ### M2（2026-10-18）：移动端适配核心可用

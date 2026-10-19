@@ -1,4 +1,4 @@
-﻿# 查看 dshremote daemon 的最近诊断事件（WS 握手/关闭、API 请求）
+# 查看 dshremote daemon 的最近诊断事件（WS 握手/关闭、API 请求）
 # 用法：.\tools\diag.ps1 [-Ip 192.168.1.10] [-Limit 40]
 param(
     [string]$Ip = '',

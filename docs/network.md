@@ -1,9 +1,9 @@
 # 组网方案（WireGuard + 局域网）
 
-> 当前采用 **WireGuard 点对点**：电脑作为服务端（10.9.0.1），手机作为客户端（10.9.0.2），
+> 推荐采用 **WireGuard 点对点**：电脑作为服务端（10.9.0.1），手机作为客户端（10.9.0.2），
 > 公网只暴露一个 **UDP 51820**（加密），daemon 的 7801 端口不对公网开放。
 
-## 一、电脑端（已配置好）
+## 一、电脑端配置
 
 - WireGuard 隧道配置：`.data\wireguard\server.conf`（含服务端私钥，注意保管）；
 - Windows 服务：`WireGuardTunnel$server`（自动启动），接口 `server` = `10.9.0.1/24`；
@@ -21,18 +21,18 @@ Get-Service 'WireGuardTunnel$server'
 
 ## 二、手机端
 
-1. 安装 WireGuard Android APK（`dist\wireguard-android.apk`）；
+1. 安装 WireGuard Android APK（电脑端安装包内已附带 `wireguard-android.apk`，也可从 <https://www.wireguard.com/install/> 下载）；
 2. 打开 App → **+** → **扫描二维码 / 导入配置**；
 3. 连接（会占用 VPN 槽，**使用前先关掉梯子**；与其它 VPN 互斥）；
 4. 手机地址变为 `10.9.0.2`；
 5. 打开 DSH Remote → 返回键 →「修改地址」→ `http://10.9.0.1:7801`（保留配对，不用重配）。
 
-> 手机配置导入后，电脑上的手机私钥文件（`phone.conf` / `phone-qr.png`）已删除，
-> 减少泄露面。若以后重装手机需要重新生成配置（改 `server.conf` 的 peer 密钥后重新出码）。
+> 建议手机配置导入后删除电脑上的手机私钥文件（`phone.conf` / `phone-qr.png`），减少泄露面；
+> 以后重装手机需要重新生成配置（改 `server.conf` 的 peer 密钥后重新出码）。
 
 ## 三、局域网直连（可选）
 
-在家/宿舍与电脑同一局域网时，可以不经过 WireGuard：
+与电脑处于同一局域网时，可以不经过 WireGuard：
 
 - 管理面板里「局域网直连」开关（需要管理员权限）；
 - App 会自动在可用地址间选择（局域网优先、WireGuard 次之）。
@@ -40,8 +40,8 @@ Get-Service 'WireGuardTunnel$server'
 ## 四、常见问题
 
 - **连不上 WireGuard**：检查路由器 UDP 51820 转发是否还在、电脑服务是否运行、
-  手机是否连的是会封 UDP 的校园网（可切流量试试）。
-- **公网 IP 变了**：家宽/宿舍公网 IP 可能变化，需要把手机配置里的 `Endpoint`
+  手机所在网络是否封 UDP（可切换 Wi-Fi / 流量试试）。
+- **公网 IP 变了**：公网 IP 可能变化，需要把手机配置里的 `Endpoint`
   更新为新 IP（或路由器开 DDNS 用域名）。
 - **手机丢了**：立刻在路由器删掉 UDP 51820 转发 → 管理面板吊销设备 →
   删除 WireGuard 里的手机 peer 并重建配置。

@@ -1,13 +1,13 @@
-# DSH Remote 电脑端测试说明
+# DSH Remote 电脑端使用说明
 
-这是一个**测试版**：用手机远程控制电脑上正在运行的 DeepSeek Harness（DSH）桌面版。
+这是一个**正式版**：用手机远程控制电脑上正在运行的 DeepSeek Harness（DSH）桌面版。
 电脑端由两部分组成：
 
 - **dsh-remote-host 插件**：装进 DSH 桌面版，让手机能接管桌面正在用的那个 Host；
 - **dshremote daemon**：一个小服务（Node.js），手机通过它连接电脑，默认端口 `7801`。
 
 手机端需要安装 `dist\dshremote-0.4.7-debug.apk`（本压缩包里已附带，版本信息见 `VERSION.txt`）。
-如果解压后没有 `dist` 目录，说明这个包没有附带 APK，请向开发者索取。
+如果解压后没有 `dist` 目录，说明这个包没有附带 APK，请从 GitHub Releases 重新下载完整包。
 
 ---
 
@@ -56,9 +56,9 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 
 ---
 
-## 三、测试清单（重点）
+## 三、功能自检清单（可选）
 
-请在测试时留意这些点，通过/失败都可以记下来：
+需要时可以按下面清单逐项自检：
 
 - [ ] 手机打开后能看到电脑上 DSH 的会话列表；
 - [ ] 打开**桌面正在使用**的会话，发一条消息能正常回复（不报 writer-held 错误）；
@@ -102,7 +102,7 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 
 ## 六、说明
 
-- 这是开发中的测试版，功能可能不完整、可能崩溃，请勿用于重要数据；
+- 这是正式版本；如遇到问题，请按上面的方式提供信息反馈；
 - 只建议在 WireGuard / 局域网等私有网络内测试，**不要**把 7801 端口直接暴露到公网；
 - 配对码是一次性的，配对成功后会自动换新码，不要截图外传。
 

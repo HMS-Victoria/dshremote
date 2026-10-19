@@ -1,4 +1,4 @@
-﻿# 把 dshremote 电脑端（插件 + daemon + 工具 + APK）打包成一个 zip，交给别人测试。
+﻿# 把 dshremote 电脑端（插件 + daemon + 工具 + APK）打包成一个 zip，用于分发安装。
 #
 # 用法：在项目根目录执行
 #   .\tools\package-pc.ps1                 # 打包（含 APK）
@@ -46,9 +46,9 @@ foreach ($name in $toolNames) {
     Copy-Item $source (Join-Path $stage 'tools\')
 }
 
-# 测试说明 + 外网访问说明
+# 使用说明 + 组网说明
 Copy-Item (Join-Path $root 'dshremote-gui.cmd') $stage
-Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-测试说明.md')
+Copy-Item (Join-Path $root 'docs\tester-guide.md') (Join-Path $stage 'README-使用说明.md')
 Copy-Item (Join-Path $root 'docs\network.md') (Join-Path $stage '网络配置说明（WireGuard）.md')
 Copy-Item (Join-Path $root 'docs\security.md') (Join-Path $stage '安全说明.md')
 
@@ -66,7 +66,7 @@ if (-not $NoApk) {
 $pluginVersion = (Get-Content (Join-Path $root 'plugin\dsh-remote-host\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
 $daemonVersion = (Get-Content (Join-Path $root 'server\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
 $versionLines = @(
-    'dshremote 电脑端测试包',
+    'dshremote 电脑端正式版',
     ('打包时间: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')),
     ('插件版本: ' + $pluginVersion),
     ('daemon 版本: ' + $daemonVersion),

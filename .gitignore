@@ -20,5 +20,5 @@ android/**/build/
 # 外部二进制（cloudflared 等，按需下载）
 tools/bin/
 
-# 构建产物（APK / PC 测试包通过 GitHub Releases 分发）
+# 构建产物（APK / PC 安装包通过 GitHub Releases 分发）
 dist/

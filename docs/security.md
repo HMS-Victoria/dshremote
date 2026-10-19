@@ -64,7 +64,7 @@ tools\switch-to-normal.cmd
 
 ## 三、外网入口
 
-当前采用 WireGuard 点对点：公网只开放 **UDP 51820**（加密），daemon 的 7801
+推荐采用 WireGuard 点对点：公网只开放 **UDP 51820**（加密），daemon 的 7801
 不对公网暴露；手机通过 WireGuard 内网地址 `http://10.9.0.1:7801` 访问。
 详见 [network.md](network.md)。
 

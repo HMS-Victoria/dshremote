@@ -74,4 +74,16 @@ class SessionStore(context: Context) {
             .remove("device_token")
             .apply()
     }
+
+    /** 只更换服务器地址，保留设备令牌（同一台电脑的局域网/Tailscale 地址可互换，无需重新配对）。 */
+    fun updateServer(serverUrl: String) {
+        val normalized = serverUrl.trim().trimEnd('/')
+        if (normalized.isEmpty()) return
+        val candidates = (serverCandidates + normalized).distinct()
+        prefs.edit()
+            .putString("server_url", normalized)
+            .putString("last_server_url", normalized)
+            .putString("server_candidates", candidates.joinToString("\n"))
+            .apply()
+    }
 }

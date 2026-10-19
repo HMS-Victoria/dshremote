@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,19 +82,40 @@ class MainActivity : ComponentActivity() {
                                 CircularProgressIndicator()
                             }
                         } else {
-                            WebViewScreen(
-                                serverUrl = server,
-                                token = store.deviceToken.orEmpty(),
-                                pendingSessionId = pendingSessionId.value,
-                                onSessionOpened = { pendingSessionId.value = null },
-                                onSwitchServer = {
-                                    store.clear()
-                                    EventService.stop(this@MainActivity)
-                                    paired = false
-                                    activeServer = null
-                                    error = null
-                                },
-                            )
+                            key(server) {
+                                WebViewScreen(
+                                    serverUrl = server,
+                                    token = store.deviceToken.orEmpty(),
+                                    pendingSessionId = pendingSessionId.value,
+                                    onSessionOpened = { pendingSessionId.value = null },
+                                    onSwitchServer = {
+                                        store.clear()
+                                        EventService.stop(this@MainActivity)
+                                        paired = false
+                                        activeServer = null
+                                        error = null
+                                    },
+                                    onServerChanged = { newUrl ->
+                                        val normalized = runCatching {
+                                            PairingClient.normalizeBaseUrl(newUrl)
+                                        }.getOrNull()
+                                        if (normalized != null) {
+                                            // 只换地址，保留设备令牌；同一台电脑无需重新配对
+                                            store.updateServer(normalized)
+                                            activeServer = normalized
+                                        } else {
+                                            error = "服务器地址不合法"
+                                        }
+                                    },
+                                    onPairingLost = {
+                                        store.clear()
+                                        EventService.stop(this@MainActivity)
+                                        paired = false
+                                        activeServer = null
+                                        error = "配对已失效（令牌过期或被吊销），请重新配对"
+                                    },
+                                )
+                            }
                         }
                     } else {
                         PairScreen(

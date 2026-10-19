@@ -56,9 +56,10 @@ export class DeviceStore {
         delete device.token;
         migrated = true;
       }
-      if (!device.expiresAt) {
-        const created = Date.parse(device.createdAt ?? '') || Date.now();
-        device.expiresAt = new Date(created + this.deviceTtlMs).toISOString();
+      const created = Date.parse(device.createdAt ?? '') || Date.now();
+      const desiredExpiresAt = new Date(created + this.deviceTtlMs).toISOString();
+      if (!device.expiresAt || Date.parse(device.expiresAt) < Date.parse(desiredExpiresAt)) {
+        device.expiresAt = desiredExpiresAt;
         migrated = true;
       }
     }

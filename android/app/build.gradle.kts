@@ -12,8 +12,8 @@ android {
         applicationId = "dev.dshremote.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.4.4"
+        versionCode = 11
+        versionName = "0.4.6"
     }
 
     buildTypes {

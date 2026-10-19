@@ -88,3 +88,11 @@ C:\Program Files\Tailscale\tailscale.exe funnel --https=443 off   # 关闭
 - **dshremote daemon**：计划任务 `dshremote-daemon`（登录后延迟 20 秒、受限权限后台启动），
   查看/修改：`Get-ScheduledTask -TaskName dshremote-daemon`；
 - 登录 DSH 桌面版后 daemon 会自动以接管模式接入（`.\tools\pair-info.ps1` 可确认）。
+
+## 七、配对持久化（0.4.6+）
+
+- 设备令牌默认有效期 **10 年**（`.data/config.json` 的 `pairing.deviceTtlMs` 可调整）；
+- App 的「修改地址」只换地址、**保留配对令牌**；同一台电脑的局域网 / Tailscale 地址可随意切换；
+- 页面加载失败会自动重试；只有服务器返回 401（令牌过期/被吊销）才提示重新配对；
+- 只有点「重新配对」才会清除令牌。
+

@@ -10,7 +10,9 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -77,6 +80,8 @@ fun WebViewScreen(
     pendingSessionId: String? = null,
     onSessionOpened: () -> Unit = {},
     onSwitchServer: () -> Unit,
+    onServerChanged: (String) -> Unit = {},
+    onPairingLost: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -89,6 +94,9 @@ fun WebViewScreen(
 
     var showMenu by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var showServerDialog by remember { mutableStateOf(false) }
+    var serverEdit by remember { mutableStateOf(serverUrl) }
+    val loadRetries = remember { intArrayOf(0) }
     val serverHost = remember(serverUrl) { runCatching { Uri.parse(serverUrl).host }.getOrNull() }
 
     // 通知点击带来的会话 id：等页面脚本就绪后调用 window.dshremoteOpenSession 打开对应会话
@@ -162,6 +170,33 @@ fun WebViewScreen(
                                 view.context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                             }
                             return true
+                        }
+
+                        override fun onPageFinished(view: WebView, url: String) {
+                            loadRetries[0] = 0
+                        }
+
+                        override fun onReceivedError(
+                            view: WebView,
+                            request: WebResourceRequest,
+                            error: WebResourceError,
+                        ) {
+                            // 主页面加载失败（网络波动/切换）时自动重试，避免直接显示错误页让用户以为要重新配对
+                            if (request.isForMainFrame && loadRetries[0] < 6) {
+                                loadRetries[0]++
+                                view.postDelayed({ view.loadUrl(serverUrl) }, 2500)
+                            }
+                        }
+
+                        override fun onReceivedHttpError(
+                            view: WebView,
+                            request: WebResourceRequest,
+                            errorResponse: WebResourceResponse,
+                        ) {
+                            // 只有令牌失效（401）才需要重新配对
+                            if (request.isForMainFrame && errorResponse.statusCode == 401) {
+                                onPairingLost()
+                            }
                         }
                     }
                     webChromeClient = object : WebChromeClient() {
@@ -253,12 +288,54 @@ fun WebViewScreen(
                 Row(horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = {
                         showMenu = false
-                        onSwitchServer()
-                    }) { Text("切换服务器") }
+                        serverEdit = serverUrl
+                        showServerDialog = true
+                    }) { Text("修改地址") }
                     TextButton(onClick = {
                         showMenu = false
                         activity?.finish()
                     }) { Text("退出") }
+                }
+            },
+        )
+    }
+
+    if (showServerDialog) {
+        AlertDialog(
+            onDismissRequest = { showServerDialog = false },
+            title = { Text("服务器地址") },
+            text = {
+                Column {
+                    Text(
+                        "修改地址不会丢失配对（同一台电脑的局域网/Tailscale 地址可互换）。\n" +
+                            "只有换了一台电脑或配对失效时才需要「重新配对」。",
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = serverEdit,
+                        onValueChange = { serverEdit = it },
+                        label = { Text("地址") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val value = serverEdit.trim()
+                    showServerDialog = false
+                    if (value.isNotEmpty()) onServerChanged(value)
+                }) { Text("保存并重连") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        showServerDialog = false
+                        onSwitchServer()
+                    }) { Text("重新配对") }
+                    TextButton(onClick = { showServerDialog = false }) { Text("取消") }
                 }
             },
         )

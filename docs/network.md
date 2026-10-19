@@ -22,10 +22,13 @@ Get-Service 'WireGuardTunnel$server'
 ## 二、手机端
 
 1. 安装 WireGuard Android APK（`dist\wireguard-android.apk`）；
-2. 打开 App → **+** → **扫描二维码**（电脑上 `.data\wireguard\phone-qr.png`）；
+2. 打开 App → **+** → **扫描二维码 / 导入配置**；
 3. 连接（会占用 VPN 槽，**使用前先关掉梯子**；与其它 VPN 互斥）；
 4. 手机地址变为 `10.9.0.2`；
 5. 打开 DSH Remote → 返回键 →「修改地址」→ `http://10.9.0.1:7801`（保留配对，不用重配）。
+
+> 手机配置导入后，电脑上的手机私钥文件（`phone.conf` / `phone-qr.png`）已删除，
+> 减少泄露面。若以后重装手机需要重新生成配置（改 `server.conf` 的 peer 密钥后重新出码）。
 
 ## 三、局域网直连（可选）
 

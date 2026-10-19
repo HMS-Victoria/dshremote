@@ -605,7 +605,12 @@ export function createProxy({ getUpstream, devices, log, eventBus, onPairingChan
     }
     const upstream = getUpstream();
     const upstreamUrl = new URL(upstream.origin);
+    // 低延迟：禁用 Nagle，开启 TCP keepalive，减少小包延迟和僵死连接
+    socket.setNoDelay(true);
+    socket.setKeepAlive(true, 15_000);
     const upstreamSocket = net.connect(Number(upstreamUrl.port), upstreamUrl.hostname, () => {
+      upstreamSocket.setNoDelay(true);
+      upstreamSocket.setKeepAlive(true, 15_000);
       const lines = [
         `GET ${req.url} HTTP/1.1`,
         `Host: ${upstream.host}`,

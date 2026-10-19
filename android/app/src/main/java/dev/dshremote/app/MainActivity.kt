@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -74,6 +75,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                DisposableEffect(Unit) {
+                    val owner = this@MainActivity
+                    val observer = object : androidx.lifecycle.DefaultLifecycleObserver {
+                        override fun onResume(ownerRef: androidx.lifecycle.LifecycleOwner) {
+                            if (paired) {
+                                scope.launch {
+                                    val resolved = withContext(Dispatchers.IO) {
+                                        ServerResolver.resolve(owner)
+                                    }
+                                    if (resolved.isNotEmpty() && resolved != activeServer) {
+                                        activeServer = resolved
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    owner.lifecycle.addObserver(observer)
+                    onDispose { owner.lifecycle.removeObserver(observer) }
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (paired) {
                         val server = activeServer

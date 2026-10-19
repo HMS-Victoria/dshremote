@@ -25,7 +25,7 @@ if (-not $Background) {
 # 后台模式：已有 daemon 在跑就不重复启动
 $runtimeFile = Join-Path $root '.data\runtime.json'
 if (Test-Path $runtimeFile) {
-    $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction SilentlyContinue
     if ($runtime -and $runtime.pid -and (Get-Process -Id $runtime.pid -ErrorAction SilentlyContinue)) {
         Write-Host ("daemon 已在运行（pid " + $runtime.pid + "）") -ForegroundColor Yellow
         exit 0

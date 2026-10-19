@@ -82,7 +82,7 @@ if (-not $SkipPnpm) {
 }
 
 # 3) 确保 bundle 已加入 dsh.profile.bundles（幂等）
-$data = Get-Content $profilePkg -Raw | ConvertFrom-Json
+$data = Get-Content $profilePkg -Raw -Encoding UTF8 | ConvertFrom-Json
 $bundles = @($data.dsh.profile.bundles)
 if ($bundles -notcontains 'dsh-remote-host') {
     $data.dsh.profile.bundles = $bundles + 'dsh-remote-host'

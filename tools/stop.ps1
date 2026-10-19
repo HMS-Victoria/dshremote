@@ -6,7 +6,7 @@ $runtimeFile = Join-Path $root '.data\runtime.json'
 
 $daemonPid = $null
 if (Test-Path $runtimeFile) {
-    $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+    $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($runtime.pid) { $daemonPid = [int]$runtime.pid }
 }
 

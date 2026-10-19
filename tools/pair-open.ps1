@@ -17,7 +17,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $runtimeFile = Join-Path $root '.data\runtime.json'
 $port = 7801
 if (Test-Path $runtimeFile) {
-    $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction SilentlyContinue
     if ($runtime -and $runtime.listen -and $runtime.listen.port) { $port = [int]$runtime.listen.port }
 }
 

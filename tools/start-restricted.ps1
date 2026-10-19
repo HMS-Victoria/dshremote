@@ -57,7 +57,7 @@ function Find-DshExe {
 function Stop-Daemon {
     if (Test-Path $runtimeFile) {
         try {
-            $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+            $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($runtime.pid) {
                 Stop-Process -Id $runtime.pid -Force -ErrorAction SilentlyContinue
                 Write-Host "已停止旧 daemon（pid $($runtime.pid)）"
@@ -95,7 +95,7 @@ function Stop-Dsh {
 function Get-HostInfo {
     param([string]$File)
     if (-not (Test-Path $File)) { return $null }
-    try { return (Get-Content $File -Raw | ConvertFrom-Json) } catch { return $null }
+    try { return (Get-Content $File -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
 function Wait-DshHost {
@@ -150,7 +150,7 @@ Write-Host " 项目:   $root"
 Write-Host '=============================================='
 
 if ($DryRun) {
-    $daemonPid = if (Test-Path $runtimeFile) { (Get-Content $runtimeFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue).pid } else { $null }
+    $daemonPid = if (Test-Path $runtimeFile) { (Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction SilentlyContinue).pid } else { $null }
     $dshCount = @(Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue).Count
     Write-Host ''
     Write-Host '[DryRun] 不会做任何改动。将要执行：'
@@ -204,7 +204,7 @@ $privFile = Join-Path $dataDir 'restricted-privs.txt'
 & runas.exe /trustlevel:0x20000 ('cmd /c whoami /priv > "' + $privFile + '" 2>&1')
 Start-Sleep -Seconds 2
 
-$runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+$runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
 $wgService = Get-Service -Name 'WireGuardTunnel$server' -ErrorAction SilentlyContinue
 $wgOn = $wgService -and $wgService.Status -eq 'Running'
 Write-Host ''

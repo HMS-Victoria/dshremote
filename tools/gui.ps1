@@ -29,7 +29,7 @@ function Get-DaemonHealth {
 function Get-DaemonRuntime {
     if (-not (Test-Path $runtimeFile)) { return $null }
     try {
-        $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+        $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($runtime -and $runtime.pid -and (Get-Process -Id $runtime.pid -ErrorAction SilentlyContinue)) { return $runtime }
         return $null
     } catch {
@@ -49,7 +49,7 @@ function Get-ServerAddress {
     $ip = ''
     if (Test-Path $configFile) {
         try {
-            $config = Get-Content $configFile -Raw | ConvertFrom-Json
+            $config = Get-Content $configFile -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($config.publicUrl) { return [string]$config.publicUrl }
         } catch {
             # 忽略损坏配置
@@ -61,14 +61,39 @@ function Get-ServerAddress {
 function Get-WireGuardSummary {
     try {
         $service = Get-Service -Name 'WireGuardTunnel$server' -ErrorAction SilentlyContinue
-        if (-not $service -or $service.Status -ne 'Running') { return '未运行' }
+        if (-not $service) { return '未安装' }
+        if ($service.Status -ne 'Running') { return '已停止（开机自启：' + $service.StartType + '）' }
         $wg = 'C:\Program Files\WireGuard\wg.exe'
         if (-not (Test-Path $wg)) { return '隧道运行中' }
         $show = & $wg show server 2>&1 | Out-String
-        if ($show -match 'latest handshake:\s*(.+)') { return '已连接（' + $Matches[1].Trim() + '）' }
-        return '隧道运行中'
+        if ($show -match 'latest handshake:\s*(.+)') {
+            $handshake = $Matches[1].Trim()
+            $handshake = $handshake -replace '(\d+)\s+seconds?', '$1 秒'
+            $handshake = $handshake -replace '(\d+)\s+minutes?', '$1 分钟'
+            $handshake = $handshake -replace '(\d+)\s+hours?', '$1 小时'
+            $handshake = $handshake -replace 'ago', '前'
+            return '已连接（' + $handshake + '）'
+        }
+        return '运行中（手机离线）'
     } catch {
         return '未知'
+    }
+}
+
+function Get-WireGuardShowText {
+    $service = Get-Service -Name 'WireGuardTunnel$server' -ErrorAction SilentlyContinue
+    $header = if ($service) { '服务状态：' + $service.Status + '（开机自启：' + $service.StartType + '）' } else { '服务状态：未安装' }
+    $wg = 'C:\Program Files\WireGuard\wg.exe'
+    if (-not (Test-Path $wg)) { return $header + [Environment]::NewLine + '未安装 WireGuard 工具' }
+    $body = & $wg show server 2>&1 | Out-String
+    return $header + [Environment]::NewLine + [Environment]::NewLine + $body
+}
+
+function Restart-WireGuardTunnel {
+    try {
+        Restart-Service -Name 'WireGuardTunnel$server' -ErrorAction Stop
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show('重启 WireGuard 失败：' + $_.Exception.Message, '提示')
     }
 }
 
@@ -200,14 +225,14 @@ $panelStatus.Controls.Add($labelDaemon)
 
 $labelWireGuard = New-Object System.Windows.Forms.Label
 $labelWireGuard.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
-$labelWireGuard.Location = New-Object System.Drawing.Point(260, 44)
+$labelWireGuard.Location = New-Object System.Drawing.Point(360, 44)
 $labelWireGuard.AutoSize = $true
 $labelWireGuard.Font = $fontSmall
 $panelStatus.Controls.Add($labelWireGuard)
 
 $labelAutostart = New-Object System.Windows.Forms.Label
 $labelAutostart.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
-$labelAutostart.Location = New-Object System.Drawing.Point(480, 44)
+$labelAutostart.Location = New-Object System.Drawing.Point(650, 44)
 $labelAutostart.AutoSize = $true
 $labelAutostart.Font = $fontSmall
 $panelStatus.Controls.Add($labelAutostart)
@@ -247,6 +272,14 @@ $buttonRestart = New-Button '重启 daemon' 100
 $panelButtons.Controls.Add($buttonRestart)
 $buttonRefresh = New-Button '刷新' 76
 $panelButtons.Controls.Add($buttonRefresh)
+$buttonWgStart = New-Button '启动 WG' 84 'Safe'
+$panelButtons.Controls.Add($buttonWgStart)
+$buttonWgStop = New-Button '停止 WG' 84 'Danger'
+$panelButtons.Controls.Add($buttonWgStop)
+$buttonWgRestart = New-Button '重启 WG' 84
+$panelButtons.Controls.Add($buttonWgRestart)
+$buttonWgInfo = New-Button '连接信息' 84
+$panelButtons.Controls.Add($buttonWgInfo)
 
 # 配对区
 $groupPair = New-Object System.Windows.Forms.GroupBox
@@ -376,7 +409,7 @@ function Refresh-Ui {
     if ($health) {
         $mode = if ($runtime -and $runtime.hostMode -eq 'plugin') { '接管模式' } else { '自启模式' }
         $upstream = if ($runtime) { $runtime.upstream } else { '' }
-        $labelDaemon.Text = 'daemon：运行中  pid ' + $health.pid + '  ' + $mode + '  ' + $upstream
+        $labelDaemon.Text = 'daemon：运行中  pid ' + $health.pid + '  ' + $mode
         $labelDaemon.ForeColor = [System.Drawing.Color]::FromArgb(74, 222, 128)
     } else {
         $labelDaemon.Text = 'daemon：未运行'
@@ -384,7 +417,7 @@ function Refresh-Ui {
     }
     $labelWireGuard.Text = 'WireGuard：' + (Get-WireGuardSummary)
     $auto = Get-AutostartState
-    $labelAutostart.Text = '开机自启：' + $auto.text
+    if ($auto.text -like '未配置*') { $labelAutostart.Text = '开机自启：未配置' } elseif ($auto.enabled) { $labelAutostart.Text = '开机自启：已开' } else { $labelAutostart.Text = '开机自启：已关' }
     if (Get-LanRuleEnabled) {
         $buttonLan.Text = '局域网直连：已允许'
         $buttonLan.BackColor = [System.Drawing.Color]::FromArgb(22, 163, 74)
@@ -495,6 +528,30 @@ $buttonWireGuard.Add_Click({
 $buttonLan.Add_Click({
     Set-LanRuleState -Enabled (-not (Get-LanRuleEnabled))
     Refresh-Ui
+})
+$buttonWgStart.Add_Click({
+    try { Start-Service -Name 'WireGuardTunnel$server' -ErrorAction Stop } catch {
+        [System.Windows.Forms.MessageBox]::Show('启动 WireGuard 失败：' + $_.Exception.Message, '提示')
+    }
+    Start-Sleep -Milliseconds 800
+    Refresh-Ui
+})
+$buttonWgStop.Add_Click({
+    $confirmed = [System.Windows.Forms.MessageBox]::Show('停止 WireGuard 会断开手机远程连接，确定吗？', '确认', 'YesNo', 'Warning')
+    if ($confirmed -ne 'Yes') { return }
+    try { Stop-Service -Name 'WireGuardTunnel$server' -Force -ErrorAction Stop } catch {
+        [System.Windows.Forms.MessageBox]::Show('停止 WireGuard 失败：' + $_.Exception.Message, '提示')
+    }
+    Start-Sleep -Milliseconds 800
+    Refresh-Ui
+})
+$buttonWgRestart.Add_Click({
+    Restart-WireGuardTunnel
+    Start-Sleep -Milliseconds 800
+    Refresh-Ui
+})
+$buttonWgInfo.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show((Get-WireGuardShowText), 'WireGuard 连接信息')
 })
 
 # 刷新定时器

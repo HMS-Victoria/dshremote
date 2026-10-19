@@ -17,7 +17,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $runtimeFile = Join-Path $root '.data\runtime.json'
 $port = 7801
 if (Test-Path $runtimeFile) {
-    $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+    $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($runtime.listen -and $runtime.listen.port) { $port = [int]$runtime.listen.port }
 }
 $base = 'http://127.0.0.1:' + $port

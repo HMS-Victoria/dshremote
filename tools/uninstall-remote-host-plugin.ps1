@@ -70,7 +70,7 @@ if ($dshDir) {
 }
 
 # 3) 从 bundles 列表移除
-$data = Get-Content $profilePkg -Raw | ConvertFrom-Json
+$data = Get-Content $profilePkg -Raw -Encoding UTF8 | ConvertFrom-Json
 $bundles = @($data.dsh.profile.bundles) | Where-Object { $_ -ne 'dsh-remote-host' }
 $data.dsh.profile.bundles = $bundles
 ($data | ConvertTo-Json -Depth 8) + "`n" | Set-Content -Path $profilePkg -Encoding utf8 -NoNewline

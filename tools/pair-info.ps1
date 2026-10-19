@@ -5,7 +5,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $pairingFile = Join-Path $root '.data\pairing.json'
 $runtimeFile = Join-Path $root '.data\runtime.json'
 
-$runtime = if (Test-Path $runtimeFile) { Get-Content $runtimeFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue } else { $null }
+$runtime = if (Test-Path $runtimeFile) { Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction SilentlyContinue } else { $null }
 $port = 7801
 if ($runtime -and $runtime.listen -and $runtime.listen.port) { $port = [int]$runtime.listen.port }
 
@@ -17,7 +17,7 @@ try {
     $livePairing = $null
 }
 
-$localPairing = if (Test-Path $pairingFile) { Get-Content $pairingFile -Raw | ConvertFrom-Json } else { $null }
+$localPairing = if (Test-Path $pairingFile) { Get-Content $pairingFile -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
 if (-not $livePairing -and -not $localPairing) {
     Write-Host '还没有配对信息 —— 请先启动 daemon：.\tools\start.ps1' -ForegroundColor Yellow
     exit 1

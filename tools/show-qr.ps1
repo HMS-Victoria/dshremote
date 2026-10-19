@@ -7,7 +7,7 @@ if (-not (Test-Path $runtimeFile)) {
     Write-Host 'daemon 未启动 —— 先运行 .\tools\start.ps1' -ForegroundColor Yellow
     exit 1
 }
-$runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+$runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json
 $port = if ($runtime.listen -and $runtime.listen.port) { $runtime.listen.port } else { 7801 }
 $url = 'http://127.0.0.1:' + $port + '/pair'
 Write-Host ('打开配对二维码页面: ' + $url) -ForegroundColor Green

@@ -15,7 +15,7 @@ if ($Url -notmatch '^https?://') { throw "地址需要以 http:// 或 https:// �
 
 $config = @{}
 if (Test-Path $configFile) {
-    $raw = Get-Content $configFile -Raw
+    $raw = Get-Content $configFile -Raw -Encoding UTF8
     if ($raw.Trim() -ne '') {
         $parsed = $raw | ConvertFrom-Json
         foreach ($property in $parsed.PSObject.Properties) { $config[$property.Name] = $property.Value }

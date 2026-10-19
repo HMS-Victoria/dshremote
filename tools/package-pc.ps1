@@ -63,8 +63,8 @@ if (-not $NoApk) {
 }
 
 # 版本信息
-$pluginVersion = (Get-Content (Join-Path $root 'plugin\dsh-remote-host\package.json') -Raw | ConvertFrom-Json).version
-$daemonVersion = (Get-Content (Join-Path $root 'server\package.json') -Raw | ConvertFrom-Json).version
+$pluginVersion = (Get-Content (Join-Path $root 'plugin\dsh-remote-host\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
+$daemonVersion = (Get-Content (Join-Path $root 'server\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
 $versionLines = @(
     'dshremote 电脑端测试包',
     ('打包时间: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')),

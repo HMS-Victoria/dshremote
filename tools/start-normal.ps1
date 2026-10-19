@@ -46,14 +46,14 @@ function Find-DshExe {
 function Get-HostInfo {
     param([string]$File)
     if (-not (Test-Path $File)) { return $null }
-    try { return (Get-Content $File -Raw | ConvertFrom-Json) } catch { return $null }
+    try { return (Get-Content $File -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
 Write-Host '正在切换回普通（管理员）启动…'
 
 # 1) 停 daemon
 if (Test-Path $runtimeFile) {
-    $runtime = Get-Content $runtimeFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $runtime = Get-Content $runtimeFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction SilentlyContinue
     if ($runtime -and $runtime.pid) {
         Stop-Process -Id $runtime.pid -Force -ErrorAction SilentlyContinue
         Write-Host "已停止 daemon（pid $($runtime.pid)）"
